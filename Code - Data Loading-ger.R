@@ -26,10 +26,12 @@ rm(packages, pkg)
   library(stm)
   
   set.seed(2020)
-  setwd("Y:\Twitter Bachelor")
+  setwd("Y:\\Twitter Bachelor")
 }
 
 ### Alle in dieser Datei aufgeführten Schritte sind als organisierter Zusatz zum Haupt-Script ("Code - Analysis.R") gedacht. Den hier präsentierten Code in seiner Gesamtheit auszuführen, führt zu keinerlei logischen und zielführenden Ergebnissen. Die folgenden Ladebefehle dienen rein der besseren Übersicht, falls eine bestimmte Datei im Hauptscript benötigt wird, die derzeit nicht geladen ist.
+
+
 
 # Verwendete Twitter-Datensätze ----
 

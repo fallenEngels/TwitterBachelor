@@ -26,11 +26,12 @@ rm(packages, pkg)
   library(stm)
   
   set.seed(2020)
-  setwd("Y:\Twitter Bachelor")
+  setwd("Y:\\Twitter Bachelor")
 }
 
 ### Der in dieser Datei präsentierte Code ist als konstant durchlaufendes Script gedacht - Vollständiges Markieren und Ausführen ist also möglich, wird aber aufgrund der voraussichtlichen Rechenzeit nicht angeraten. Da einige der im Folgenden erzeugen Dateien aus aufwändigen und/oder rechenintensiven Schritten entstehen, besteht die Möglichkeit, diese komplexeren Elemente direkt zu laden. Aus diesem Grund werden sich an einzelnen Punkten in auskommentierter Form die Codes zum Speichern und Laden von Workspace-Dateien der jeweils erzeugten Daten finden.
 # Sollte man nach einer bestimmten Datei suchen, oder einen überblick über alle verfügbaren Workspace-Elemente haben wollen, so findet sich im zweiten R-Script ("Code - Data Loading.R") der Speicher- und Ladecode gebündelt und in übersichtlicher Form.
+
 
 
 # Verwendete Twitter-Datensätze ----
@@ -47,31 +48,36 @@ head(as_tibble(tweets), n=20)
 # Es ist aufgrund der schieren Größe der Tweet-Datensätze (jeweils >5GB) je nach vorhandenem Arbeitsspeichers dazu zu raten, diese nur dann zu laden, wenn sie aktiv benötigt werden und nach Gebrauch zu entladen ( rm(NAME) ). Sollte dies den Speicher nicht komplett leeren, kann mit Garbage Collection oder R-Neustart nachgeholfen werden ( gc() bzw. .rs.restartR() respektive).
 
 
+
 # Analyse Users: ----
-names(users)
+
 ### Account-Sprachen
 languages <- data.frame(sort(table(users$account_language), decreasing = T))
 languages
 head(users$user_profile_description[users$account_language == "ar"], 10)
 # Vermutlich ISO 639-1 bzw. lokalisierte (en-gb, zh-cn) Tags. Der Großteil der Accounts sind englischsprachig eingestellt, aber ein knappes Drittel gibt russisch als Sprache an. West- u. Zentraleuropäische Accounts sind die drittgrößte Gruppe (Deutschland, UK, Frankreich, Spanien, Italien) vor arabischen Accounts. Vereinzelte Chinesen, Indonesier und Ukrainer.
+
+#Aufbereitung als Data Frame, Gruppierung und Vorbereitung für Vergleich mit angegebenen Orten
 lang1 <- as.character(languages[, 1])
 lang2 <- languages[, 2]
 other <- which(lang1 %in% c("zh-cn", "id"))
 europe <- which(lang1 %in% c("de","en-gb", "fr", "es", "it"))
-lang1 <- append(lang1, c("european", "others", "fantasy", "na"))
+lang1 <- append(lang1, c("european", "others", "fantasy", "NA")) # fantasy + NA -> Platzhalter für später
 lang2 <- append(lang2, c(sum(lang2[europe]), sum(lang2[other]), 0, sum(is.na(users$account_language))))
 lang1 <- lang1[-c(other, europe)]
 lang2 <- lang2[-c(other, europe)]
 loclang <- data.frame(lang1, lang2)
 names(loclang) <- c("language", "language_n")
 rm(lang1, lang2, other, europe)
+
+loclang
 sum(loclang$language_n)
+
 ### Orte
 table(users$user_reported_location)
-#Keine eindeutige Sortierung - wie zu vermuten bei individuellen Angaben - also manuelle Nachsortierung notwendig! (Im Folgenden hinter {Klammern} versteckbar für bessere Übersicht)
+#Keine eindeutige Sortierung - wie zu vermuten bei individuellen Angaben - also manuelle Nachsortierung notwendig! (Im Folgenden hinter {Klammern} versteckbar für bessere Übersicht und einfache Code-Ausführung)
 {
   users$shortened_location <- ifelse(users$user_reported_location %in% c("U.S.A", "USA", "Usa", "usa", "US", "us", "united states", "United States", "America", "AMERICA", "Amerika", "THE US", "mother America", "Murica", "Estados Unidos", "Douglas, United States"), "US", NA)
-  
   # US-Bundesstaaten und D.C.
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Troy, Alabama", "alabama", "AL"), "US, Alabama", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Alaska"), "US, Alaska", users$shortened_location)
@@ -125,7 +131,6 @@ table(users$user_reported_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c(), "US, Wyoming", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Washington D.C", "Washington D.C.", "Washington, D.C.", "Washington, DC"), "US, Washington D.C.", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Guanica zona urbana, PR, USA"), "US, Unincorporated", users$shortened_location)
-  
   # Russland
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Krasnoyarsk", "Krasnoyarsk, Russia", "Ekaterinburg, Russia", "Chelyabinsk, Russia", "Volgograd", "Velikiy Novgorod, Russia", "Stavropol, Russia", "Ufa, Russia", "Rostov-na-Donu, Russia", "russia", "Russia", "Russian Empire", "novgorod", "Tomsk", "Republic of Chechnya, Russia", "Crimea, Russia", "Perm, Russia", "Penza", "Omsk, Russia", "Nizhniy Novgorod, Russia", "Murmansk, Russia", "Irkutsk", "Chelyaba", "belgorod", "✴Новгород✴", "Уфа", "Ульяновск", "Тула, Тульская область", "уфа", "ул. Ленина", "ростов-я-тону", "россия", "омск", "новосибирск", "новгород", "екб", "днищний дновгород", "Ярославль, Россия", "Ярославль", "Чита", "Чеченская республика, Россия", "Челябинск", "Челны", "Чебоксары, Россия", "Чебоксары", "Ханты-Мансийск", "Хабаровск, Россия", "Хабаровск", "Тула, Россия", "Тула", "Тува", "Томск", "Тольятти", "Тверь", "Тверское подворье", "Ташла", "Тамань", "Сраратов", "Сочи, Россия", "Сочи", "Смоленск", "Симферополь", "Саров", "Саратов )))", "Саратов", "Саранск", "Самара", "Рязань", "Ростов-на-Дону, Россия", "Ростов-на-Дону", "Ростов-На-Дону"), "Russia", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Ростов", "Россия, Казань", "Россия", "Российская Федерация", "РФ", "Пятигорск", "Пенза", "Орел", "Омск, Россия", "Омск", "Нягань", "Мурманск", "Магадан", "Люберцы", "Луга", "Липецк", "Курск", "Красноярск", "Киров", "Кемерово", "Петрозаводск", "Пермь", "овосибирск, Россия", "Новосибирск", "Новосиб", "Новокузнецк, Россия", "Новгород", "Новосибирск, Россия", "Краснодар", "Котлас", "Кострома", "Кольский п-в", "Новосибирск, Россия", "Нижний Новогород", "Нижний Новгород", "Нижний", "Екатеринбург...", "Екатеринбург", "ЕКБ", "Ё-бург", "Нижний Новгород", "Нижний", "Набережные Челны, Россия", "Калуга, Россия", "Калуга", "Казань", "Калининград, Россия", "Калининград", "Иркутск", "Иваново", "Елец", "Барнаул, Россия"), "Russia", users$shortened_location)
@@ -158,7 +163,6 @@ table(users$user_reported_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Пхеньян"), "North Korea", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("katamandu"), "Nepal", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("ZM"), "Zambia", users$shortened_location)
-  
   # Other
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Universe", "Wonderland", "sin city", "Love Town", "Liberty City", "Fattyland", "garage", "hood", "I AM A CITIZEN OF THE UNIVERSE", "Islamic States of America", "dreamland", "Black America", "хогвортс", "Cosmopolitanism", "2148", "الدولة الإسلامية", "мой мир", "амфетаминовая столица", "Я везде", "Черемухи", "ЦАО", "Третий Рим",  "Раша", "Работа))", "Мечтовиль", "Мечта", "Красти Бургер", "Артем", "#РусскийМир"), "Other", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Newhustle", "vladik", "Man", "piter", "Jersey", "KN", "Birmingham", "Cromwell", "ширкино", "Ch", "сжигай толерантный рай,слышишь", "сейчас орел", "Таллин, Санкт-Петербург", "Сибирь матушка", "Северная столица", "♠Питер♠", "питер", "Питер", "Новгород - СПб", "НН", "Владик ДВФУ", "Вильнюс - Москва", "Ватноград", "Бутово", "Адлер", "Adler", "☼Новосибчик☼"), "Unidentified", users$shortened_location)
@@ -168,14 +172,44 @@ sum(is.na(users$shortened_location))
 length(grep("US", users$shortened_location))
 length(grep("Russia", users$shortened_location))
 
+#Grouping
 arabic <- length(grep("Bahrain", users$shortened_location)) + length(grep("Egypt", users$shortened_location)) + length(grep("Lebanon", users$shortened_location)) + length(grep("Iraq", users$shortened_location)) + length(grep("Syria", users$shortened_location)) + length(grep("Jordan", users$shortened_location)) + length(grep("Saudi-Arabia", users$shortened_location)) + length(grep("Oman", users$shortened_location))
 easteuro <- length(grep("Belarus", users$shortened_location)) + length(grep("Czechia", users$shortened_location)) + length(grep("Estonia", users$shortened_location)) + length(grep("Ukraine", users$shortened_location)) + length(grep("United Kingdom", users$shortened_location))
-europe <- length(grep("Belgium", users$shortened_location)) + length(grep("France", users$shortened_location)) + length(grep("Germany", users$shortened_location)) + length(grep("Italy", users$shortened_location)) + length(grep("Sweden", users$shortened_location))
+westeuro <- length(grep("Belgium", users$shortened_location)) + length(grep("France", users$shortened_location)) + length(grep("Germany", users$shortened_location)) + length(grep("Italy", users$shortened_location)) + length(grep("Sweden", users$shortened_location))
 other <- length(grep("Azerbaijan", users$shortened_location)) + length(grep("Nepal", users$shortened_location)) + length(grep("North Korea", users$shortened_location)) + length(grep("Philippines", users$shortened_location)) + length(grep("Turkey", users$shortened_location)) + length(grep("Zambia", users$shortened_location))
 
-loc1 <- c("US", "Russia", "Arabic", "East Europe", "Europe", "other", "Fantasy", "NAs")
-loc2 <- c(length(grep("US", users$shortened_location)), length(grep("Russia", users$shortened_location)), arabic, easteuro, europe, other, (length(grep("Unidentified", users$shortened_location)) + length(grep("Fantasy", users$shortened_location))), sum(is.na(users$shortened_location)))
+loc1 <- c("US", "Russia", "Arabic", "East Europe", "West Europe", "other", "Fantasy", "NA")
+loc2 <- c(length(grep("US", users$shortened_location)), length(grep("Russia", users$shortened_location)), arabic, easteuro, westeuro, other, (length(grep("Unidentified", users$shortened_location)) + length(grep("Fantasy", users$shortened_location))), sum(is.na(users$shortened_location)))
 loclang <- loclang %>% mutate(location = loc1, location_n = loc2)
-rm(arabic, easteuro, europe, other, loc1, loc2)
+rm(arabic, easteuro, westeuro, other, loc1, loc2)
 loclang
-# Hohe Konsistenz zwischen den Spracheinstellungen und Ortsangaben. Englisch (en) überwiegt bei den Sprachen zwar deutlich im Vergleich mit den angegebene Orten, aber da englisch global dominant ist, ist davon auszugehen, dass auch Nutzer in anderen Ländern ihre Accounts auf englisch einstellen (-> Europa) - oder dass es einfach die Standardeinstellung ist, und diese Nutzer sie nie geändert haben. Der deutliche Anstieg in Osteuropa lässt sich durch die Tatsache erklären, dass bis auf zwei ukrainis-sprachige Angaben (was sich mit den languages deckt) alle Ortsangaben auf russisch waren.
+# Konsistenz zwischen den Spracheinstellungen und Ortsangaben. Englisch (en) überwiegt bei den Sprachen zwar deutlich im Vergleich mit den angegebene Orten, aber da englisch global dominant ist, ist davon auszugehen, dass auch Nutzer in anderen Ländern ihre Accounts auf englisch einstellen (-> Europa) - oder dass es einfach die Standardeinstellung ist, und diese Nutzer sie nie geändert haben. Der deutliche Anstieg in Osteuropa lässt sich durch die Tatsache erklären, dass bis auf zwei ukrainisch-sprachige Angaben (was sich mit den languages deckt) alle Ortsangaben aus diesem Gebiet auf russisch waren.
+
+
+### Account-Erstelldaten
+quartals <- c(as.Date("2009-01-01"), as.Date("2009-04-01"), as.Date("2009-07-01"), as.Date("2009-10-01"))
+for(i in 10:18){
+  year <- as.character(2000 + i)
+  for(q in c("-01-01", "-04-01", "-07-01", "-10-01")){
+    quartals <- append(quartals, as.Date(paste(year, q, sep ="")))
+  }
+}
+rm(i, q, year)
+quartals <-  quartals[1:39]
+hist(users$account_creation_date, breaks = quartals)
+# Der Großteil der Accounts wurde im Zeitraum 2. Häfte 2013 - 1. Häfte 2014 erstellt - lange vor dem US-Wahlkampf 2016. Mögliche Erklärungen: Zeitnutzung, um Accounts als "seriös" zu etablieren, oder Nutzung der Accounts zur Beeinflussung anderer Themen als der Wahl.
+
+
+### Gefolgte Accounts
+hist(users$following_count)
+hist(log2(users$following_count))
+summary(users$following_count)
+# Ein Großteil der Accounts folgt nur ein paar Hundert Accounts (wenn überhaupt), während einige wenige Accounts mehreren zehntausend Accounts folgen -> Wahrscheinlich Nutzung von Follow-Bots, um Nummern zu erhöhen.
+
+followbots <- users[which(users$following_count >= 10000), ]
+followbots <- followbots[, 7:8]
+followbots
+summary(lm(followbots$follower_count ~ followbots$following_count))
+summary(lm(users$follower_count ~ users$following_count))
+# Für die Accounts, die über 10.000 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für alle 3.600 Accounts die Anzahl gefolgter Accounts gut 25% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,246), ist es für die Accounts mit über 10.000 Follows eine Varianzaufklärung von über 60% (adj. R^2 = 0,611)!
+
