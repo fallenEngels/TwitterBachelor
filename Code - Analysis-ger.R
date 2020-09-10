@@ -213,3 +213,19 @@ summary(lm(followbots$follower_count ~ followbots$following_count))
 summary(lm(users$follower_count ~ users$following_count))
 # Für die Accounts, die über 10.000 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für alle 3.600 Accounts die Anzahl gefolgter Accounts gut 25% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,246), ist es für die Accounts mit über 10.000 Follows eine Varianzaufklärung von über 60% (adj. R^2 = 0,611)!
 
+
+
+# Analyse Tweets ----
+
+### Tweet-Zeiten
+times <- tibble(dt = tweets$tweet_time %>% ymd_hms()) %>%
+  mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
+ggplot(times, aes(x = timeset)) + geom_bar() + theme_minimal() + ggtitle("Tweets by UTC time, all tweets")
+#Es gibt deutlich erkennbare Muster in den Tweetzeiten. So werden eine große Menge Tweets zwischen 07:00 und 17:00 UTC abgesetzt, während zwischen 21:00 und 06:00 UTC bedeutend weniger Tweets verfasst wurden.
+#Das bedeutet, dass die Großzahl der Tweets nach amerikanischer Sicht zwischen 03:00 und 13:00 (Ostküste) bzw. 00:00 und 10:00 (Westküste) verfasst wurden. Geht man von russischen Verfassern aus, so liegt die Hochfrequenz zwischen 10:00 und 20:00 (Moskau/St. Petersburg). Es gibt also entweder Hochzeiten während der Morgensunden in Amerika oder während den Arbeitsstunden in West-Russland.
+
+times_eng <- tweets %>% filter(tweet_language %in% c("en")) %>% tibble(dt = tweet_time %>% ymd_hms()) %>%
+  mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
+ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() + ggtitle("Tweets by UTC time, english language tweets")
+# Filtert man nur nach englischsprachigen Tweets, so verschiebt sich das Maximum auf 13:00-17:00 UTC, mit einem Minimum zwischen 03:00-08:00 UTC.
+#Somit sind die Minima bei 20:00-01:00 (Westküste) und 23:00-04:00 (Ostküste), bzw. 6:00-11:00 (Moskau) und die Maxima bei 06:00-01:00 (Westküste) und 09:00-04:00 (Ostküste), bzw. 16:00-11:00 (Moskau)
