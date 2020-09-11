@@ -263,6 +263,7 @@ langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filte
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
   theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+# save("user-languages_ggplot.RData")
 # ODER: load("user-languages_ggplot.RData")
 
 
@@ -272,9 +273,37 @@ print(langplot_3)
 print(langplot_4)
 print(langplot_5)
 print(langplot_6)
-#Relative Einheitlichkeit über die Zeit für alle Accounts. Vereinzelte russische Tweets in dominant englischen Accounts und anders herum, aber keine systemischen Veränderungen sichtbar. Zusätzlich zeigt sich, dass viele Accounts nur für vergleichsweise kurze Zeit aktiv waren. Auch scheint immer wieder ein kleiner Anzeigefehler aufzutauchen, dieser wirkt sich aber bei genauerer Betrachtung nicht wirklich auf die sichtbaren Ergebnisse aus.
+# Relative Einheitlichkeit über die Zeit für alle Accounts. Vereinzelte russische Tweets in dominant englischen Accounts und anders herum, aber keine systemischen Veränderungen sichtbar. Zusätzlich zeigt sich, dass viele Accounts nur für vergleichsweise kurze Zeit aktiv waren. Auch scheint immer wieder ein kleiner Anzeigefehler aufzutauchen, dieser wirkt sich aber bei genauerer Betrachtung nicht wirklich auf die sichtbaren Ergebnisse aus.
 
 
 ### Tweets vs. Retweets
 
-#Zwei Graphen: Tweets/Retweets vs. Followerzahl, Tweets/Retweets vs. Tweetzahl 
+#Zwei Graphen: Tweets/Retweets vs. Followerzahl, Tweets/Retweets vs. Tweetzahl
+
+
+# Cleanup Data Sets ----
+
+### Sprache: Da es hier um die Beeinflussung der USA gehen soll, sind nur englischsprachige Tweets von Interesse - Der ANteil von Amerikanern, die russisch, ukrainisch oder eine der anderen Sprachen beherrschen und auf zufällig aufauchende Tweets in diesen Sprachen reagieren sollte nicht ausreichen, um einen bedeutenden Einfluss zu entwickeln.
+tweets_eng <- tweets %>% filter(tweet_language %in% c("en"))
+rm(tweets)
+
+### Entfernung nicht berücksichtigter Informationen
+
+# Retweets: Retweets sind zwar für eine Netzwerkanalyse ineressant, für die hier im folgenden angewendete Sprachprozessierung jedoch nicht wirklich hilfreich, da ein einzelner Tweet unter Umständen durch Retweets mehrere hundert Male im Datensatz vorkommen und so die Klassifizierung beeinflussen könnten.
+tweets_eng <- tweets_eng %>% filter(is_retweet == FALSE)
+
+# Getaggte Nutzer: Viele der Tweets taggen andere Nutzer per @NUTERNAME. Da diese Information auch über die Variable "user_mentions" in den Daten vorhanden ist und die Nutzernamen unter Umständen die Textanalyse des Topic Models beeinflussen, werden sie zu Beginn entfernt. Auch Hashtag-Symbole können entfernt werden, da verwendete Hashtags separat in einer eigenen Variable getrackt werden.
+tweets_eng$tweet_text <- gsub("@[a-zA-Z0-9_]*", "", tweets_eng$tweet_text)
+tweets_eng$tweet_text <- gsub("#", "", tweets_eng$tweet_text)
+
+### Verwendete Medien: Viele der Nutzer verknüpfen ihre Posts mit Bild- oder Videomedien oder Links zu anderen Webinhalten. Diese werden innerhalb des Tweet-Textes als abgekürzter Link (https://t.co/...) dargestellt. Da diese Medien und externen Verlinkungen bei der hier durchgeführten Analyse nicht beachtet werden, können sie entfernt werden.
+tweets_eng$tweet_text <- gsub("https?://t.co/[a-zA-Z0-9]*", "", tweets_eng$tweet_text)
+
+### Emoji
+# Viele der Tweets beinhalten Emoji. Diese können vom stm-Textprozessor nicht bearbeitet werden, da sie zwar technisch als Zahlen- und Buchstabenkombinationen angegeben werden, eine korrekte Verarbeitung jedoch nicht gewährleistet werden kann. Zusätzlich dazu ist es in vielen Tweets der Fall, dass Emoji untereinander bzw. Emoji und tatsächliche Worte nicht durch Leerstelen getrennt werden. Diese Tatsache führt dazu, dass der Gesamtverbund aus Emoji und Wort als Texteinheit etabliert wird und somit beispielsweise "☑️wort" und "wort" als grundverschiedene Einheiten erfasst werden. Das führt dazu, dass beispielsweise ein Topic-definierendes Wort ohne die Entfernung der Emoji "💥eraseobama���are���" war. Eine Umbenennung der Emoji in Text war demnach eindeutig vonnöten.
+#Um dies zu beheben wurde auf Basis der offiziellen Emoji-Liste des Unicode-Konsortiums (https://www.unicode.org/emoji/charts/full-emoji-list.html, aufgerufen und erstellt am 30.03.2020) ein Datensatz erstellt, der die Emojinummer, das entsprechende Browser-Emoji und den jeweiligen offiziellen Kurznamen sowie die Anzahl der für jedes Emoji verwendeten Symbole beinhaltet. Diese Kurznamen wurden als Grundlage für die Text-Ersetzungen genommen. Die Voranstellung von "emoj_" an jeden der Begriffe sorgt dabei dafür, dass jedes Emoji auch in Textform klar erkennbar bleibt. Die Entfernung jeglicher Leerstellen und Sonderzeichen sorgt dafür, dass jedes Emoji als ein einzelnes Wort behandelt wird.
+emoji <- read_csv2("Emoji/emoji-list.txt", col_names = T, col_types = cols(code = col_character(), Replace = col_character()), locale = locale(encoding = "UTF-8"))
+#Hinzufügen einer Leerstelle, um Emoji voneinander zu trennen, sollten mehrere direkt aufeinander folgen
+emoji$Replace <- paste(" ", emoji$Replace, " ")
+for (i in seq(1,length(emoji$Replace))){tweets_eng$tweet_text <- gsub(emoji$code[i], emoji$Replace[i], tweets_eng$tweet_text)}
+# ACHTUNG: Berechnete Laufzeit: Mehrere Stunden  (1809 Loop-Iterationen über 2 Mio. Strings mit variablen Längen)!
