@@ -36,7 +36,6 @@ rm(packages, pkg)
 
 # Verwendete Twitter-Datensätze ----
 users <- read_csv("Twitter Data/ira_users_csv_hashed.csv") # Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
-users_oldver <- read_csv("Twitter Data/ira_users_csv_hashed_alt.csv") # Datensatz der Nutzer, Version vom 15.10.2018
 
 tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
 tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 15.10.2018
@@ -228,4 +227,54 @@ times_eng <- tweets %>% filter(tweet_language %in% c("en")) %>% tibble(dt = twee
   mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
 ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() + ggtitle("Tweets by UTC time, english language tweets")
 # Filtert man nur nach englischsprachigen Tweets, so verschiebt sich das Maximum auf 13:00-17:00 UTC, mit einem Minimum zwischen 03:00-08:00 UTC.
-#Somit sind die Minima bei 20:00-01:00 (Westküste) und 23:00-04:00 (Ostküste), bzw. 6:00-11:00 (Moskau) und die Maxima bei 06:00-01:00 (Westküste) und 09:00-04:00 (Ostküste), bzw. 16:00-11:00 (Moskau)
+#Somit sind die Minima bei 20:00-01:00 (Westküste) und 23:00-04:00 (Ostküste), bzw. 6:00-11:00 (Moskau) und die Maxima bei 06:00-01:00 (Westküste) und 09:00-04:00 (Ostküste), bzw. 16:00-11:00 (Moskau).
+
+
+### Tweet-Sprachen nach Account
+
+# Analyse der Anzahl englisch-/russischsprachiger Tweets für alle Accounts in den Daten, um nach sprachlicher EInheitlichkeit oder systematischen Veränderungen zu suchen. Aufgrund der großen Account-Anzahl (3608) aufgesplittet in mehrere Plots. Sollte sich im Plot-Fenster nach Ausführen des Print-Befehls kein Ergebnis zeigen, so kann es helfen, dieses zu vergrößern. Eine tatsächliche Analyse der Grafiken ist in RStudio selbst nicht möglich, die Dateien können jedoch als PDF exportiert und dann betrachtet werden - Exportmaße von ca. 40x80″ werden empfohlen.
+langplot_1 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1:600]) %>%
+  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+langplot_2 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[601:1200]) %>%
+  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+langplot_3 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1201:1800]) %>%
+  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+langplot_4 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1801:2400]) %>%
+  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+langplot_5 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[2401:3000]) %>%
+  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[3001:3608]) %>%
+  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+# ODER: load("user-languages_ggplot.RData")
+
+
+print(langplot_1)
+print(langplot_2)
+print(langplot_3)
+print(langplot_4)
+print(langplot_5)
+print(langplot_6)
+#Relative Einheitlichkeit über die Zeit für alle Accounts. Vereinzelte russische Tweets in dominant englischen Accounts und anders herum, aber keine systemischen Veränderungen sichtbar. Zusätzlich zeigt sich, dass viele Accounts nur für vergleichsweise kurze Zeit aktiv waren. Auch scheint immer wieder ein kleiner Anzeigefehler aufzutauchen, dieser wirkt sich aber bei genauerer Betrachtung nicht wirklich auf die sichtbaren Ergebnisse aus.
+
+
+### Tweets vs. Retweets
+
+#Zwei Graphen: Tweets/Retweets vs. Followerzahl, Tweets/Retweets vs. Tweetzahl 
