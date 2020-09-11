@@ -264,7 +264,7 @@ langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filte
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
   theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
 # save("user-languages_ggplot.RData")
-# ODER: load("user-languages_ggplot.RData")
+# DATEIEN LADEN: load("user-languages_ggplot.RData")
 
 
 print(langplot_1)
@@ -307,3 +307,52 @@ emoji <- read_csv2("Emoji/emoji-list.txt", col_names = T, col_types = cols(code 
 emoji$Replace <- paste(" ", emoji$Replace, " ")
 for (i in seq(1,length(emoji$Replace))){tweets_eng$tweet_text <- gsub(emoji$code[i], emoji$Replace[i], tweets_eng$tweet_text)}
 # ACHTUNG: Berechnete Laufzeit: Mehrere Stunden  (1809 Loop-Iterationen über 2 Mio. Strings mit variablen Längen)!
+rm(i, emoji)
+
+# write_csv(tweets_eng, file.path("Twitter Data/tweets_en-cleaned.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+# DATEIEN LADEN: tweets_eng <- read_csv("Twitter Data/tweets_en-cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+
+### Das Problem der Duplikate ----
+
+duplicates$tweet_text[1:10]
+duplicates <- tweets_eng[which(duplicated(tweets_eng$tweet_text)), ]
+tweets_clean <- tweets_eng[which(!(duplicated(tweets_eng$tweet_text))), ]
+# Auch ohne Retweets schaffen es eine bedeutende Menge an Tweets, mehrfach in den Daten aufzuauchen, da sie wortgleich mehrfach gepostet wurden. Zwar lassen sich diese relativ simpel entfernen, aber es finden sich zweifellos auch wortähnliche Tweets bzw. Tweets, die sich nur durch das Erwähnen bestimmter Namen unterscheiden, und somit von dieser Filterung nicht erfasst werden würden. Zwar wäre es für die Einheitlichkeit der Daten am Besten, diese Duplikate alle zu belassen, da dann aber die einzelnen Topics sehr von Formulierungen dominiert und wenig aussagekräftig sein würden, wird dieser Filterung durchgeführt. Es muss einfach im Hinterkopf behalten werden, dass solche "unperfekten" Duplikate noch in den Daten vorhanden sein könnten.
+rm(tweets_eng)
+
+
+# STM - Vorbereitung ----
+
+toks <- quanteda::tokens(tweets_clean$tweet_text,
+                         remove_symbols = TRUE,
+                         remove_separators = TRUE,
+                         remove_punct = TRUE)
+
+toks <- tokens_remove(tokens_tolower(toks), stopwords("en"))
+toks <- tokens_wordstem(toks)
+dtm <- dfm(toks)
+dtm <- dfm_trim(dtm, min_docfreq = 15)
+#dtm 
+
+docvars(dtm, "date") <- tweets_clean$tweet_time
+docvars(dtm, "quotecount") <- tweets_clean$quote_count
+docvars(dtm, "replycount") <- tweets_clean$reply_count
+docvars(dtm, "likecount") <- tweets_clean$like_count
+docvars(dtm, "retweetcount") <- tweets_clean$retweet_count
+
+stm_dtm <- convert(dtm, to = "stm")
+# Durch das Entfernen von Stopwords werden ca. 2.000 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt.
+
+# save(stm_dtm, file = "stm_dtm.RData")
+# DATEN LADEN: load("stm_dtm.RData")
+rm(dtm)
+
+# STM - Suche nach K ----
+
+select_k <- searchK(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
+                    K = seq(10, 110, by = 10),
+                    prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
+                    init.type = "Spectral", max.em.its = 10, seed = 2020)
+
+# save(select_k, file = "selectK.RData")
+# DATEN LADEN: load("selectK.RData")
