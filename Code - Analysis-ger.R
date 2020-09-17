@@ -1,7 +1,7 @@
 # Packages und Vorbereitung ----
 # Alle Analysen wurden mit R-Version 4.0.2 und RStudio 1.3.959 durchgeführt. Verwendete Packages werden hier gesammelt gelistet:
 
-packages <- c("dplyr", "readr", "tidyr", "stringi", "tibble", "ggplot2", "reshape2", "corrplot", "cowplot", "lubridate", "magrittr", "tm", "stm", "RColorBrewer")
+packages <- c("dplyr", "readr", "tidyr", "stringi", "stringr", "tibble", "ggplot2", "reshape2", "corrplot", "cowplot", "lubridate", "magrittr", "tm", "stm", "RColorBrewer")
 for (pkg in packages) {
   if (pkg %in% rownames(installed.packages()) == FALSE)
   {install.packages(pkg)}
@@ -19,6 +19,7 @@ rm(packages, pkg)
   library(cowplot)
   library(tidyr)
   library(stringi)
+  library(stringr)
   library(lubridate)
   library(quanteda)
   library(magrittr)
@@ -38,7 +39,8 @@ rm(packages, pkg)
 users <- read_csv("Twitter Data/ira_users_csv_hashed.csv") # Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
 
 tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
-tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 15.10.2018
+
+#tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 15.10.2018
 
 head(as_tibble(tweets), n=20)
 # Nutzung von read_csv (readr) statt read.csv (base), da base-Funktion ohne großen Aufwand nicht zur Darstellung der unterschiedlichen Schriftsätze (westlich, kyrillisch, arabisch, ...) fähig zu sein scheint.
@@ -263,8 +265,8 @@ langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filte
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
   theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
-# save("user-languages_ggplot.RData")
-# DATEIEN LADEN: load("user-languages_ggplot.RData")
+# save("Saved Files/user-languages_ggplot.RData")
+# DATEIEN LADEN: load("Saved Files/user-languages_ggplot.RData")
 
 
 print(langplot_1)
@@ -299,6 +301,19 @@ tweets_eng$tweet_text <- gsub("#", "", tweets_eng$tweet_text)
 ### Verwendete Medien: Viele der Nutzer verknüpfen ihre Posts mit Bild- oder Videomedien oder Links zu anderen Webinhalten. Diese werden innerhalb des Tweet-Textes als abgekürzter Link (https://t.co/...) dargestellt. Da diese Medien und externen Verlinkungen bei der hier durchgeführten Analyse nicht beachtet werden, können sie entfernt werden.
 tweets_eng$tweet_text <- gsub("https?://t.co/[a-zA-Z0-9]*", "", tweets_eng$tweet_text)
 
+### Entfernung unnötiger Klammern und leerer Einträge in bestimmten Spalten
+tweets_eng$hashtags <- str_replace_all(tweets_eng$hashtags, "\\[", "")
+tweets_eng$hashtags <- str_replace_all(tweets_eng$hashtags, "\\]", "")
+tweets_eng$hashtags[tweets_eng$hashtags==""] <- NA
+
+tweets_eng$urls <- str_replace_all(tweets_eng$urls, "\\[", "")
+tweets_eng$urls <- str_replace_all(tweets_eng$urls, "\\]", "")
+tweets_eng$urls[tweets_eng$urls==""] <- NA
+
+tweets_eng$user_mentions <- str_replace_all(tweets_eng$user_mentions, "\\[", "")
+tweets_eng$user_mentions <- str_replace_all(tweets_eng$user_mentions, "\\]", "")
+tweets_eng$user_mentions[tweets_eng$user_mentions==""] <- NA
+
 ### Emoji
 # Viele der Tweets beinhalten Emoji. Diese können vom stm-Textprozessor nicht bearbeitet werden, da sie zwar technisch als Zahlen- und Buchstabenkombinationen angegeben werden, eine korrekte Verarbeitung jedoch nicht gewährleistet werden kann. Zusätzlich dazu ist es in vielen Tweets der Fall, dass Emoji untereinander bzw. Emoji und tatsächliche Worte nicht durch Leerstelen getrennt werden. Diese Tatsache führt dazu, dass der Gesamtverbund aus Emoji und Wort als Texteinheit etabliert wird und somit beispielsweise "☑️wort" und "wort" als grundverschiedene Einheiten erfasst werden. Das führt dazu, dass beispielsweise ein Topic-definierendes Wort ohne die Entfernung der Emoji "💥eraseobama���are���" war. Eine Umbenennung der Emoji in Text war demnach eindeutig vonnöten.
 #Um dies zu beheben wurde auf Basis der offiziellen Emoji-Liste des Unicode-Konsortiums (https://www.unicode.org/emoji/charts/full-emoji-list.html, aufgerufen und erstellt am 30.03.2020) ein Datensatz erstellt, der die Emojinummer, das entsprechende Browser-Emoji und den jeweiligen offiziellen Kurznamen sowie die Anzahl der für jedes Emoji verwendeten Symbole beinhaltet. Diese Kurznamen wurden als Grundlage für die Text-Ersetzungen genommen. Die Voranstellung von "emoj_" an jeden der Begriffe sorgt dabei dafür, dass jedes Emoji auch in Textform klar erkennbar bleibt. Die Entfernung jeglicher Leerstellen und Sonderzeichen sorgt dafür, dass jedes Emoji als ein einzelnes Wort behandelt wird.
@@ -307,15 +322,17 @@ emoji <- read_csv2("Emoji/emoji-list.txt", col_names = T, col_types = cols(code 
 emoji$Replace <- paste(" ", emoji$Replace, " ")
 for (i in seq(1,length(emoji$Replace))){tweets_eng$tweet_text <- gsub(emoji$code[i], emoji$Replace[i], tweets_eng$tweet_text)}
 # ACHTUNG: Berechnete Laufzeit: Mehrere Stunden  (1809 Loop-Iterationen über 2 Mio. Strings mit variablen Längen)!
+tweets_eng$tweet_text <- gsub("  ", " ", tweets_eng$tweet_text)
+# Entfernung von möglichen mehrfachen Leerstellen, um eventuell möglichen Problemen zuvorzukommen.
 rm(i, emoji)
 
 # write_csv(tweets_eng, file.path("Twitter Data/tweets_en-cleaned.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
 # DATEIEN LADEN: tweets_eng <- read_csv("Twitter Data/tweets_en-cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 
 ### Das Problem der Duplikate ----
-
+?duplicated
+duplicates <- tweets_eng[which(base::duplicated(tweets_eng$tweet_text)), ]
 duplicates$tweet_text[1:10]
-duplicates <- tweets_eng[which(duplicated(tweets_eng$tweet_text)), ]
 tweets_clean <- tweets_eng[which(!(duplicated(tweets_eng$tweet_text))), ]
 # Auch ohne Retweets schaffen es eine bedeutende Menge an Tweets, mehrfach in den Daten aufzuauchen, da sie wortgleich mehrfach gepostet wurden. Zwar lassen sich diese relativ simpel entfernen, aber es finden sich zweifellos auch wortähnliche Tweets bzw. Tweets, die sich nur durch das Erwähnen bestimmter Namen unterscheiden, und somit von dieser Filterung nicht erfasst werden würden. Zwar wäre es für die Einheitlichkeit der Daten am Besten, diese Duplikate alle zu belassen, da dann aber die einzelnen Topics sehr von Formulierungen dominiert und wenig aussagekräftig sein würden, wird dieser Filterung durchgeführt. Es muss einfach im Hinterkopf behalten werden, dass solche "unperfekten" Duplikate noch in den Daten vorhanden sein könnten.
 rm(tweets_eng)
@@ -328,7 +345,7 @@ toks <- quanteda::tokens(tweets_clean$tweet_text,
                          remove_separators = TRUE,
                          remove_punct = TRUE)
 
-toks <- tokens_remove(tokens_tolower(toks), stopwords("en"))
+toks <- tokens_remove(tokens_tolower(toks), c(stopwords("en"), "will", "can", "says", "get", "say", "go"))
 toks <- tokens_wordstem(toks)
 dtm <- dfm(toks)
 dtm <- dfm_trim(dtm, min_docfreq = 15)
@@ -343,9 +360,10 @@ docvars(dtm, "retweetcount") <- tweets_clean$retweet_count
 stm_dtm <- convert(dtm, to = "stm")
 # Durch das Entfernen von Stopwords werden ca. 2.000 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt.
 
-# save(stm_dtm, file = "stm_dtm.RData")
-# DATEN LADEN: load("stm_dtm.RData")
-rm(dtm)
+# save(stm_dtm, file = "Saved Files/stm_dtm.RData")
+# DATEN LADEN: load("Saved Files/stm_dtm.RData")
+rm(dtm, toks)
+
 
 # STM - Suche nach K ----
 
@@ -354,5 +372,27 @@ select_k <- searchK(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
                     prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
                     init.type = "Spectral", max.em.its = 10, seed = 2020)
 
-# save(select_k, file = "selectK.RData")
-# DATEN LADEN: load("selectK.RData")
+# save(select_k, file = "Saved Files/selectK.RData")
+# DATEN LADEN: load("Saved Files/selectK.RData")
+plot(select_k)
+selectk_df <- data.frame(K = unlist(select_k$results$K), exclus = unlist(select_k$results$exclus), semcoh = unlist(select_k$results$semcoh),
+                         heldout = unlist(select_k$results$heldout), residual = unlist(select_k$results$residual),
+                         bound = unlist(select_k$results$bound), lbound = unlist(select_k$results$lbound), em.its = unlist(select_k$results$em.its))
+selectk_df %>% select(K, semcoh, exclus, heldout, em.its) %>%
+  pivot_longer(-K, names_to = "measure", values_to = "value") %>%
+  ggplot(aes(x = K, y = value, group = measure, color = measure)) +
+  geom_line() +  facet_wrap(.~measure, scale = "free", ncol = 2) +
+  labs(y = "", title = "Exklusivität und semantische Kohärenz für K Topics", subtitle = "Bei einem Test mit max. 10 Iterationen") +
+  theme_minimal() +
+  theme(legend.position="none")
+# Residuen-Spike bei 100 Topics, lbound-Minimum bei 90 Topics, Iteraionen: Ab 70 Topics Konvergenz bei unter 10 Iterationen, Exklusivität: Plateau ab ca. 60 Topics mit lok. Minimum bei 80, Kohärenz-Beuge ab 70  Topics, Verbesserung der Heldout-Likelihood bei 80 Topics, Plateau bei 90/100 Topics -> 90 Topics erscheinen als beste Wahl
+
+
+# STM - Interpretation ----
+
+stm_model_90 <- stm(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
+                    K = 90,
+                    prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
+                    init.type = "Spectral", max.em.its = 75, seed = 2020)
+# save(stm_model_90, file = "Saved Files/stm_mod_90.RData")
+# DATEN LADEN: load("Saved Files/stm_mod_90.RData")

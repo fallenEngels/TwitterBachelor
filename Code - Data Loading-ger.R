@@ -41,11 +41,14 @@ tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tw
 tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 15.10.2018
 
 # Analyse Tweets ----
-load("users_ggplot.RData")
+load("Saved Files/users_ggplot.RData")
 
 # Cleanup Data Sets ----
 tweets_eng <- read_csv("Twitter Data/tweets_en-cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 
 # STM - Vorbereitung und Suche nach K ----
-load("stm_dtm.RData")
+load("Saved Files/stm_dtm.RData")
+
 load("selectK.RData")
+
+# STM - Interpretation ----
