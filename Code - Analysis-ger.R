@@ -317,7 +317,7 @@ tweets_eng$user_mentions[tweets_eng$user_mentions==""] <- NA
 ### Emoji
 # Viele der Tweets beinhalten Emoji. Diese können vom stm-Textprozessor nicht bearbeitet werden, da sie zwar technisch als Zahlen- und Buchstabenkombinationen angegeben werden, eine korrekte Verarbeitung jedoch nicht gewährleistet werden kann. Zusätzlich dazu ist es in vielen Tweets der Fall, dass Emoji untereinander bzw. Emoji und tatsächliche Worte nicht durch Leerstelen getrennt werden. Diese Tatsache führt dazu, dass der Gesamtverbund aus Emoji und Wort als Texteinheit etabliert wird und somit beispielsweise "☑️wort" und "wort" als grundverschiedene Einheiten erfasst werden. Das führt dazu, dass beispielsweise ein Topic-definierendes Wort ohne die Entfernung der Emoji "💥eraseobama���are���" war. Eine Umbenennung der Emoji in Text war demnach eindeutig vonnöten.
 #Um dies zu beheben wurde auf Basis der offiziellen Emoji-Liste des Unicode-Konsortiums (https://www.unicode.org/emoji/charts/full-emoji-list.html, aufgerufen und erstellt am 30.03.2020) ein Datensatz erstellt, der die Emojinummer, das entsprechende Browser-Emoji und den jeweiligen offiziellen Kurznamen sowie die Anzahl der für jedes Emoji verwendeten Symbole beinhaltet. Diese Kurznamen wurden als Grundlage für die Text-Ersetzungen genommen. Die Voranstellung von "emoj_" an jeden der Begriffe sorgt dabei dafür, dass jedes Emoji auch in Textform klar erkennbar bleibt. Die Entfernung jeglicher Leerstellen und Sonderzeichen sorgt dafür, dass jedes Emoji als ein einzelnes Wort behandelt wird.
-emoji <- read_csv2("Emoji/emoji-list.txt", col_names = T, col_types = cols(code = col_character(), Replace = col_character()), locale = locale(encoding = "UTF-8"))
+emoji <- read_csv2("Other Files/emoji-list.txt", col_names = T, col_types = cols(code = col_character(), Replace = col_character()), locale = locale(encoding = "UTF-8"))
 #Hinzufügen einer Leerstelle, um Emoji voneinander zu trennen, sollten mehrere direkt aufeinander folgen
 emoji$Replace <- paste(" ", emoji$Replace, " ")
 for (i in seq(1,length(emoji$Replace))){tweets_eng$tweet_text <- gsub(emoji$code[i], emoji$Replace[i], tweets_eng$tweet_text)}
@@ -360,6 +360,9 @@ docvars(dtm, "retweetcount") <- tweets_clean$retweet_count
 stm_dtm <- convert(dtm, to = "stm")
 # Durch das Entfernen von Stopwords werden ca. 2.000 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt.
 
+used_documents <- names(stm_dtm$documents)
+used_documents <- used_documents %>% gsub("^text", "", .) %>% as.integer(.)
+
 # save(stm_dtm, file = "Saved Files/stm_dtm.RData")
 # DATEN LADEN: load("Saved Files/stm_dtm.RData")
 rm(dtm, toks)
@@ -396,3 +399,39 @@ stm_model_90 <- stm(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
                     init.type = "Spectral", max.em.its = 75, seed = 2020)
 # save(stm_model_90, file = "Saved Files/stm_mod_90.RData")
 # DATEN LADEN: load("Saved Files/stm_mod_90.RData")
+
+plot(stm_model_90, type = "summary", xlim = c(0, 0.2), n = 5)
+# Aufgrund der großen Anzahl an Topics ist auch dies ein Plot, der vermutlich nur als abgespeicherte Datei betrachtet werden kann. Abmessungen von 15 x 8 in werden empfohlen.
+
+# Manuelle Kodierung der Topics basierend auf zentralen Worten (prob ≙ Wahrscheinlichkeit und frex ≙ Exklusivität zu Topic) sowie Top-Tweets des jeweiligen Topics, um Kategorisierung vornehmen zu können.
+
+labels <- labelTopics(stm_model_90, topics = 90, n = 10)
+prob <- list()
+frex <- list()
+for(i in c(1:90)){
+  prob[[i]] <- paste(labels$prob[i,], collapse = ' ')
+  frex[[i]] <- paste(labels$frex[i,], collapse = ' ')
+}
+labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), Topics = 1:90)
+rm(labels, prob, frex)
+
+# Kodierungsregeln:
+# - 3 Hauptkategorien: News, Person, Spam
+#   -> News: Sachlich formulierte Sätze zu aktuellem Geschehen, wie sie sich bei Tweets von Nachrichtenorganisationen zu neuen Themen finden könnten. Das heißt nicht, dass alle diese Tweets tatsächlich von diesen Organisationen kommen, nur, dass keine Wertung aus dem Tweet klar ersichtlich wird.
+#   -> Spam: Tweets, die "normale Menschen" vermutlich nicht posten würden: Entweder, weil der Tweet selbst durch übermäßiges Taggen anderer Nutzer auffällt, eine bedeutende Menge an Emoji beinhaltet (wobei hier der genaue Umbruchpunkt rein subjektiv ist und in meinen Augen  zwischen 4-5 liegt) oder ähnliches Verhalten an den Tag legt. Auf Topic-Ebene: Tweets, die zwar individuell "normal" erscheinen, sich aber über mehrere Tweets hinweg deutlich in Formulierungen und Satzstrukturen ähneln, sodass von einer gemeinsamen Quelle mit speziefischem Ziel ausgegangen werden kann. Bei Spam zu politischen Themen wird zudem eine vermutende Eingruppierung in rechte / linke Ideen und Positionen unterschieden.
+#   -> Person: Tweets über private Angelegenheiten, Zitate, Nachrichtenvermittlung mit wertender Einordnung; Tweets wie sie ein "normaler Mensch" schreiben könnte.
+# - Zusätzlich zu dieser groben Einteilung werden auch die jeweils behandelten Themenkomplexe (z.B. Sportnachrichten, Spam-Werbung für ein bestimmtes Produkt, Persönliche Tweets zu Workoutroutinen, ...) erfasst und aufgelistet, um deren Anteil und Verteilung untersuchen zu können.
+# - Auch bestimmte Worte, die sich durch die Tweets ziehen, werden festgehalten, da diese die einzelnen Topics erklären können. Sie werden mit Anführungszeichen als vorkommende Worte im Gegensatz zu abgeleiteten Überschriften markiert.
+
+# Um einer bestimmten Hauptkategorie zugeordnet zu werden, müssen mindestens 6 der top 20 Tweets des jeweiligen Topics der Kategorie entstammen.
+# Um ein Wort zugeordnet zu bekommen, muss es entweder in mindestens 6 der top 20 Tweets oder in den Prob-/Frex-Listen des jeweiligen Topics vorkommen.
+# -> 6/20, damit die Kodierung die Möglichkeit zulässt, bei Topics ohne klaren Fokus alle drei Labels anbringen zu können, ohne die Kodierregeln zu brechen. In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte (Topics 21, 25, 59), oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen (Topics 30, 52, ) wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
+
+top <- 60
+{
+  print(labels_df[top, 1])
+  print(labels_df[top, 2])
+  thought <- findThoughts(stm_model_90, n = 20, topics = top, text = tweets_clean$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " "))
+}
+# Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.

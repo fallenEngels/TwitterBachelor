@@ -46,9 +46,16 @@ load("Saved Files/users_ggplot.RData")
 # Cleanup Data Sets ----
 tweets_eng <- read_csv("Twitter Data/tweets_en-cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 
+tweets_clean <- tweets_eng[which(!(duplicated(tweets_eng$tweet_text))), ]
+rm(tweets_eng)
+
 # STM - Vorbereitung und Suche nach K ----
 load("Saved Files/stm_dtm.RData")
+
+used_documents <- names(stm_dtm$documents)
+used_documents <- used_documents %>% gsub("^text", "", .) %>% as.integer(.)
 
 load("selectK.RData")
 
 # STM - Interpretation ----
+load("Saved Files/stm_mod_90.RData")
