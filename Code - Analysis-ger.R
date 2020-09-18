@@ -413,7 +413,7 @@ for(i in c(1:90)){
   frex[[i]] <- paste(labels$frex[i,], collapse = ' ')
 }
 labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), Topics = 1:90)
-rm(labels, prob, frex)
+rm(labels, prob, frex, i)
 
 # Kodierungsregeln:
 # - 3 Hauptkategorien: News, Person, Spam
@@ -425,9 +425,9 @@ rm(labels, prob, frex)
 
 # Um einer bestimmten Hauptkategorie zugeordnet zu werden, müssen mindestens 6 der top 20 Tweets des jeweiligen Topics der Kategorie entstammen.
 # Um ein Wort zugeordnet zu bekommen, muss es entweder in mindestens 6 der top 20 Tweets oder in den Prob-/Frex-Listen des jeweiligen Topics vorkommen.
-# -> 6/20, damit die Kodierung die Möglichkeit zulässt, bei Topics ohne klaren Fokus alle drei Labels anbringen zu können, ohne die Kodierregeln zu brechen. In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte (Topics 21, 25, 59), oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen (Topics 30, 52, ) wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
+# -> 6/20, damit die Kodierung die Möglichkeit zulässt, bei Topics ohne klaren Fokus alle drei Labels anbringen zu können, ohne die Kodierregeln zu brechen. In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte (Topics 21, 25, 59, 61), oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen (Topics 30, 52, ) wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
 
-top <- 60
+top <- 90 #Zu betrachtendes Topic
 {
   print(labels_df[top, 1])
   print(labels_df[top, 2])
@@ -435,3 +435,28 @@ top <- 60
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " "))
 }
 # Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.
+
+# Die Topics mit dem größten erwarteten Anteil drehen sich um lokale Verbrechen (Top. 68, Platz 1), Sport (Top. 71, Platz 2) und Gerichte und -entscheidungen (Top. 66, Platz 3). ALl diese Topics wurden als "News" deklariert. Das erste "Person"-Topic liegt auf Platz 4 (Top. 2, "Workout"), das erste Spam-Topic auf Platz 9 (Top. 39, Ukraine-Verschwörungstheorie).
+rm(thought, top)
+
+
+### Topic-Korrelation
+label_csv <- read.csv("Other Files/STM_TopicLabels.csv", sep = ';', stringsAsFactors = F)
+
+corr <- cor(stm_model_90$theta[,1:90])
+dissim <- 1 - corr
+dist_mat <- as.dist(dissim)
+colnames(corr) <- paste(label_csv$Number, label_csv$Label, sep = ". ")
+rownames(corr) <- paste(label_csv$Number, label_csv$Label, sep = ". ")
+diag(corr) <- 0
+min(corr)
+max(corr)
+corrplot(corr, order = "hclust", hclust.method = "complete",
+         cl.lim = c(-.33,.33), is.corr=FALSE, diag = F,
+         insig = "blank", method="color",
+         addrect = 10, cl.pos = "b", tl.cex = .45,
+         tl.col = "black",rect.col = "black",
+         #col = rev(colorRamp("blue2red")))
+         col = c(rev(gray.colors(120))[1:43], "white", rev(gray.colors(120))[78:120]))
+# Für bessere Betrachtung: Abspeicherung als .pdf (10" x 10") wird empfohlen.
+rm(dissim, dist_mat)
