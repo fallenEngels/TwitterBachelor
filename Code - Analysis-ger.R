@@ -460,3 +460,49 @@ corrplot(corr, order = "hclust", hclust.method = "complete",
          col = c(rev(gray.colors(120))[1:43], "white", rev(gray.colors(120))[78:120]))
 # Für bessere Betrachtung: Abspeicherung als .pdf (10" x 10") wird empfohlen.
 rm(dissim, dist_mat)
+
+
+### Topic-Verteilungen
+
+#Wöchentlich gemittelt
+dates <- paste(year(stm_dtm$meta$date), "-", isoweek(stm_dtm$meta$date), sep = "")
+for (i in 1:length(dates)) {
+  if (nchar(dates[i]) == 6) {
+    stri_sub(dates[i], 6, 5) <- 0
+  }
+}
+topic_times <- data.frame(dates, stm_model_90$theta)
+counts <- topic_times %>% count(dates)
+colnames(topic_times) <- c("date", paste("topic_",1:90, sep = ""))
+topic_times <- aggregate(.~date, FUN = mean, data = topic_times)
+topic_times <- topic_times %>% mutate(count = counts[,2])
+
+topic_times.long <- reshape2::melt(topic_times, id.vars = c("date", "count"))
+ggplot(topic_times.long, aes(x = date, y = value * count, group = variable, color = variable)) +
+  geom_line() + theme(legend.position = "bottom") + 
+  geom_line(aes(x = date, y = count), color = "black") +
+  scale_y_sqrt() +
+  labs(title = "Topic-Anteile gemittelt nach Woche", y = "Anzahl an Tweets", x = "Kalenderwoche") +
+  theme(axis.text.x = element_text(angle = 90), legend.position = "none")
+
+# Gruppiert nach Themenkomplex
+topic_grp <- topic_times %>% select(-c(date, count))
+topic_grp <- as.data.frame(t(topic_grp))
+topic_grp <- topic_grp %>% mutate(group = label_csv$Group)
+topic_grp <- aggregate(.~group, FUN = sum, data = topic_grp)
+grp_names <- topic_grp[,1]
+topic_grp <- select(topic_grp,-c(group))
+topic_grp <- as.data.frame(t(topic_grp))
+topic_grp <- topic_grp %>% mutate(date = topic_times$date, count = topic_times$count)
+colnames(topic_grp) <- c(grp_names, "date", "count")
+
+topic_grp.long <- reshape2::melt(topic_grp, id.vars = c("date", "count"))
+ggplot(topic_grp.long, aes(x = date, y = value, group = variable, color = variable)) + 
+  geom_line() + theme(legend.position = "bottom") + 
+  labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
+  theme(axis.text.x = element_text(angle = 90))
+ggplot(topic_grp.long, aes(x = date, y = value, group = variable, fill = variable)) + 
+  geom_bar(position="stack", stat="identity") + theme(legend.position = "bottom") + 
+  labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
