@@ -240,32 +240,32 @@ langplot_1 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filte
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
 langplot_2 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[601:1200]) %>%
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
 langplot_3 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1201:1800]) %>%
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
 langplot_4 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1801:2400]) %>%
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
 langplot_5 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[2401:3000]) %>%
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
 langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[3001:3608]) %>%
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
 }
 # save("Saved Files/user-languages_ggplot.RData")
 # DATEIEN LADEN: load("Saved Files/user-languages_ggplot.RData")
@@ -297,7 +297,7 @@ user_rts[, 5] <- user_rts[, 4] / user_rts[, 3]
 names(user_rts) <- c("userid", "followers", "postcount", "retweets", "rtpercent")
 table(is.nan(user_rts$rtpercent))
 # 129 Accounts ohne jegliche Postings
-user_rts %>% filter(is.nan(user_rts$rtpercent)) %>% ggplot(aes(x = followers)) + geom_histogram()
+user_rts %>% filter(is.nan(user_rts$rtpercent)) %>% ggplot(aes(x = followers)) + geom_histogram() + theme_minimal()
 # Großteil mit 0 Followern, aber doch einige Accounts, die mehrere hundert FOllower angesammelt haben.
 user_rts <- user_rts[!(is.nan(user_rts$rtpercent)), ]
 
@@ -531,7 +531,7 @@ topic_times.long <- reshape2::melt(topic_times, id.vars = c("date", "count"))
 ggplot(topic_times.long, aes(x = date, y = value * count, group = variable, color = variable)) +
   geom_line() + theme(legend.position = "bottom") + 
   geom_line(aes(x = date, y = count), color = "black") +
-  scale_y_sqrt() +
+  scale_y_sqrt() + theme_minimal() +
   labs(title = "Topic-Anteile gemittelt nach Woche", y = "Anzahl an Tweets", x = "Kalenderwoche") +
   theme(axis.text.x = element_text(angle = 90), legend.position = "none")
 
@@ -550,9 +550,9 @@ topic_grp.long <- reshape2::melt(topic_grp, id.vars = c("date", "count"))
 ggplot(topic_grp.long, aes(x = date, y = value, group = variable, color = variable)) + 
   geom_line() + theme(legend.position = "bottom") + 
   labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
-  theme(axis.text.x = element_text(angle = 90))
+  theme(axis.text.x = element_text(angle = 90)) + theme_minimal()
 ggplot(topic_grp.long, aes(x = date, y = value, group = variable, fill = variable)) + 
   geom_bar(position="stack", stat="identity") + theme(legend.position = "bottom") + 
   labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme_minimal()
 
