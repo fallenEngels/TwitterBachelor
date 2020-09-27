@@ -1,7 +1,7 @@
 # Packages und Vorbereitung ----
 # Alle Analysen wurden mit R-Version 4.0.2 und RStudio 1.3.959 durchgeführt. Verwendete Packages werden hier gesammelt gelistet:
 
-packages <- c("dplyr", "readr", "tidyr", "stringi", "stringr", "tibble", "ggplot2", "reshape2", "corrplot", "cowplot", "lubridate", "magrittr", "tm", "stm", "RColorBrewer")
+packages <- c("dplyr", "readr", "tidyr", "stringi", "stringr", "tibble", "ggplot2", "reshape2", "corrplot", "cowplot", "lubridate", "magrittr", "tm", "stm", "RColorBrewer", "scales")
 for (pkg in packages) {
   if (pkg %in% rownames(installed.packages()) == FALSE)
   {install.packages(pkg)}
@@ -235,6 +235,7 @@ ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() + ggtitle("Tw
 ### Tweet-Sprachen nach Account
 
 # Analyse der Anzahl englisch-/russischsprachiger Tweets für alle Accounts in den Daten, um nach sprachlicher EInheitlichkeit oder systematischen Veränderungen zu suchen. Aufgrund der großen Account-Anzahl (3608) aufgesplittet in mehrere Plots. Sollte sich im Plot-Fenster nach Ausführen des Print-Befehls kein Ergebnis zeigen, so kann es helfen, dieses zu vergrößern. Eine tatsächliche Analyse der Grafiken ist in RStudio selbst nicht möglich, die Dateien können jedoch als PDF exportiert und dann betrachtet werden - Exportmaße von ca. 40x80″ werden empfohlen.
+{
 langplot_1 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1:600]) %>%
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
@@ -265,6 +266,7 @@ langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filte
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
   scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
   theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y")
+}
 # save("Saved Files/user-languages_ggplot.RData")
 # DATEIEN LADEN: load("Saved Files/user-languages_ggplot.RData")
 
@@ -281,6 +283,54 @@ print(langplot_6)
 ### Tweets vs. Retweets
 
 #Zwei Graphen: Tweets/Retweets vs. Followerzahl, Tweets/Retweets vs. Tweetzahl
+tweet_rts <- tweets %>% select(userid, is_retweet)
+user_rts <- data.frame(users$userid, users$follower_count)
+
+for(i in 1:nrow(users)){
+  id <- users$userid[i]
+  df <- tweet_rts %>% filter(userid == id)
+  rt <- df %>% filter(is_retweet == TRUE)
+  user_rts[i, 3] <- nrow(df)
+  user_rts[i, 4] <- nrow(rt)
+} # kann einen kurzen Moment dauern
+user_rts[, 5] <- user_rts[, 4] / user_rts[, 3]
+names(user_rts) <- c("userid", "followers", "postcount", "retweets", "rtpercent")
+table(is.nan(user_rts$rtpercent))
+# 129 Accounts ohne jegliche Postings
+user_rts %>% filter(is.nan(user_rts$rtpercent)) %>% ggplot(aes(x = followers)) + geom_histogram()
+# Großteil mit 0 Followern, aber doch einige Accounts, die mehrere hundert FOllower angesammelt haben.
+user_rts <- user_rts[!(is.nan(user_rts$rtpercent)), ]
+
+user_rts %>% ggplot(aes(x = rtpercent)) + geom_histogram(bins = 100) + 
+  labs(x = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users") +
+  theme_minimal()
+#Die große Mehrheit der Accounts setzt auf eigene Postings und wenige bis gar keine Retweets, während einige Accounts nur aus Retweets zu bestehen scheinen. Auffällig ist auch eine Ansammlung an Accounts um die 85-90% Retweet-Rate.
+
+user_rts %>% ggplot(aes(x = followers, y = rtpercent)) + geom_point() + 
+  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma) +
+  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
+       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") +
+  theme_minimal()
+# Accounts mit vielen Followern (fünfstellig und aufwärts) setzen hauptsächlich auf eigene Tweets und retweeten wenig. Mit zunehmender Follower-Zahl gent die Anzahl an Retweets weiter zurück.
+user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = rtpercent)) + geom_point() + 
+  scale_x_log10(name = "Follower-Zahl (log10)", labels = scales::comma) +
+  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
+       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") +
+  theme_minimal()
+# Es zeigt sich kein deutlicher Unterschied in der Follower-Zahl zwischen den Gruppen mit beinahe gar keinen Retweets und der Gruppe mit fast ausschließlich Retweets. Um die 100 Follower herum findet sich zusätzlich noch eine kleine Gruppe an Accounts mit 55-65% Retweet-Anteil.
+
+user_rts %>% ggplot(aes(x = postcount, y = rtpercent)) + geom_point() + 
+  scale_x_continuous(name = "Posting-Anzahl", labels = scales::comma) +
+  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
+       subtitle = "Aufgeteilt nach Posting-Anzahl des Nutzers") +
+  theme_minimal()
+# Der Account, der mit ABstand die meisten Postings veröffentlicht hat, hat dies zu großen Teilen durch Retweets bewerkstelligt. Die nächstgrößeren Accounts mit 50.000+ Posts retweeten dagegen jedoch kaum bzw. zu großen Teilen quasi gar nicht. -> Nachrichtenseiten, die eigene Artikel teilen?
+user_rts %>% ggplot(aes(x = postcount, y = rtpercent, color = rtpercent)) + geom_point() + 
+  scale_x_log10(name = "Posting-Anzahl (log10)", labels = scales::comma) +
+  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
+       subtitle = "Aufgeteilt nach Posting-Anzahl des Nutzers") +
+  theme_minimal()
+# Accounts mit vielen Postings scheinen mehr zu Retweeten als andere Accounts, auch wenn sich kein deutlicher Unterschied abzeichnet.
 
 
 # Cleanup Data Sets ----
