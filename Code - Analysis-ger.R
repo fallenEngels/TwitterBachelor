@@ -27,7 +27,7 @@ rm(packages, pkg)
   library(stm)
   
   set.seed(2020)
-  setwd("Y:\\Twitter Bachelor")
+  setwd("E:\\Twitter Bachelor")
 }
 
 ### Der in dieser Datei präsentierte Code ist als konstant durchlaufendes Script gedacht - Vollständiges Markieren und Ausführen ist also möglich, wird aber aufgrund der voraussichtlichen Rechenzeit nicht angeraten. Da einige der im Folgenden erzeugen Dateien aus aufwändigen und/oder rechenintensiven Schritten entstehen, besteht die Möglichkeit, diese komplexeren Elemente direkt zu laden. Aus diesem Grund werden sich an einzelnen Punkten in auskommentierter Form die Codes zum Speichern und Laden von Workspace-Dateien der jeweils erzeugten Daten finden.
@@ -40,7 +40,7 @@ users <- read_csv("Twitter Data/ira_users_csv_hashed.csv") # Datensatz der Nutze
 
 tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
 
-#tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 15.10.2018
+#tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, ursprüngliche Version vom 15.10.2018 - original für ANalysen mit aufgenommen, in Endversion des Scriptes jedoch nicht benötigt.
 
 head(as_tibble(tweets), n=20)
 # Nutzung von read_csv (readr) statt read.csv (base), da base-Funktion ohne großen Aufwand nicht zur Darstellung der unterschiedlichen Schriftsätze (westlich, kyrillisch, arabisch, ...) fähig zu sein scheint.
@@ -54,8 +54,9 @@ head(as_tibble(tweets), n=20)
 
 ### Account-Sprachen
 languages <- data.frame(sort(table(users$account_language), decreasing = T))
+languages$perc <- languages$Freq / nrow(users) *100
 languages
-head(users$user_profile_description[users$account_language == "ar"], 10)
+head(users$user_profile_description[users$account_language == "de"], 10)
 # Vermutlich ISO 639-1 bzw. lokalisierte (en-gb, zh-cn) Tags. Der Großteil der Accounts sind englischsprachig eingestellt, aber ein knappes Drittel gibt russisch als Sprache an. West- u. Zentraleuropäische Accounts sind die drittgrößte Gruppe (Deutschland, UK, Frankreich, Spanien, Italien) vor arabischen Accounts. Vereinzelte Chinesen, Indonesier und Ukrainer.
 
 #Aufbereitung als Data Frame, Gruppierung und Vorbereitung für Vergleich mit angegebenen Orten
@@ -69,6 +70,7 @@ lang1 <- lang1[-c(other, europe)]
 lang2 <- lang2[-c(other, europe)]
 loclang <- data.frame(lang1, lang2)
 names(loclang) <- c("language", "language_n")
+loclang$language_perc <- loclang$language_n / nrow(users) * 100
 rm(lang1, lang2, other, europe)
 
 loclang
@@ -170,8 +172,11 @@ table(users$user_reported_location)
 }
 table(users$shortened_location)
 sum(is.na(users$shortened_location))
-length(grep("US", users$shortened_location))
-length(grep("Russia", users$shortened_location))
+
+length(grep("US,", users$shortened_location))
+length(grep("US,", users$shortened_location)) / length(grep("US", users$shortened_location)) *100
+sort(table(users$shortened_location[grep("US,", users$shortened_location)]), decreasing = T)
+# Knapp 44% der US-Amerikaner haben eine genauere Ortsngabe als nur "USA" oder vergleichbares getätigt, es lässt sich jedoch keine politische Tendenz erkennen.
 
 #Grouping
 arabic <- length(grep("Bahrain", users$shortened_location)) + length(grep("Egypt", users$shortened_location)) + length(grep("Lebanon", users$shortened_location)) + length(grep("Iraq", users$shortened_location)) + length(grep("Syria", users$shortened_location)) + length(grep("Jordan", users$shortened_location)) + length(grep("Saudi-Arabia", users$shortened_location)) + length(grep("Oman", users$shortened_location))
@@ -183,6 +188,7 @@ loc1 <- c("US", "Russia", "Arabic", "East Europe", "West Europe", "other", "Fant
 loc2 <- c(length(grep("US", users$shortened_location)), length(grep("Russia", users$shortened_location)), arabic, easteuro, westeuro, other, (length(grep("Unidentified", users$shortened_location)) + length(grep("Fantasy", users$shortened_location))), sum(is.na(users$shortened_location)))
 loclang <- loclang %>% mutate(location = loc1, location_n = loc2)
 rm(arabic, easteuro, westeuro, other, loc1, loc2)
+loclang$location_perc <- loclang$location_n / nrow(users) *100
 loclang
 # Konsistenz zwischen den Spracheinstellungen und Ortsangaben. Englisch (en) überwiegt bei den Sprachen zwar deutlich im Vergleich mit den angegebene Orten, aber da englisch global dominant ist, ist davon auszugehen, dass auch Nutzer in anderen Ländern ihre Accounts auf englisch einstellen (-> Europa) - oder dass es einfach die Standardeinstellung ist, und diese Nutzer sie nie geändert haben. Der deutliche Anstieg in Osteuropa lässt sich durch die Tatsache erklären, dass bis auf zwei ukrainisch-sprachige Angaben (was sich mit den languages deckt) alle Ortsangaben aus diesem Gebiet auf russisch waren.
 
@@ -197,8 +203,30 @@ for(i in 10:18){
 }
 rm(i, q, year)
 quartals <-  quartals[1:39]
-hist(users$account_creation_date, breaks = quartals)
+ggplot(users, aes(x = account_creation_date, fill = account_language)) + geom_histogram(breaks = quartals) + 
+  scale_fill_manual(name = "Sprache", values = c("#189159", "#BEA310", "#F8766D", "#D35130", "#915123", "#BE6D10",
+                                                  "#4D9E22", "#AE8046", "#619CFF", "#4A3FC6", "#00BA38"),
+                    labels = c("Arabisch", "Deutsch", "Englisch", "Englisch (GB)", "Spanisch", "Französisch",
+                               "Indonesisch", "Italienisch", "Russisch", "Ukrainisch", "Chinesisch")) +
+  labs(x = "Quartal", y = "Anzahl Accounts", title = "Erstelldatum aller Accounts, gruppiert nach Quartal und Account-Sprache") + theme_minimal()
 # Der Großteil der Accounts wurde im Zeitraum 2. Häfte 2013 - 1. Häfte 2014 erstellt - lange vor dem US-Wahlkampf 2016. Mögliche Erklärungen: Zeitnutzung, um Accounts als "seriös" zu etablieren, oder Nutzung der Accounts zur Beeinflussung anderer Themen als der Wahl.
+table(users$account_creation_date < "2013-06-01")
+table(users$account_creation_date > "2014-06-01")
+(2199-121) / nrow(users) *100
+# 121 Accounts wurden vor dieser Spitze erstellt, 2078 bzw. 57,6% in dieser Spitze.
+min(users$account_creation_date); max(users$account_creation_date)
+
+
+### Aktivitäts-Zeitraum
+activity <- data.frame(userid = users$userid, cration = users$account_creation_date)
+activity <- activity %>% filter(userid %in% unique(tweets$userid))
+for(i in 1:nrow(users)){
+  twe <- tweets %>% filter(userid == users$userid[i])
+  if(nrow(twe) != 0){
+    activity[i, 3] <- min(twe$tweet_time)
+    activity[i, 4] <- max(twe$tweet_time)
+  }
+}
 
 
 ### Gefolgte Accounts
@@ -279,6 +307,16 @@ print(langplot_5)
 print(langplot_6)
 # Relative Einheitlichkeit über die Zeit für alle Accounts. Vereinzelte russische Tweets in dominant englischen Accounts und anders herum, aber keine systemischen Veränderungen sichtbar. Zusätzlich zeigt sich, dass viele Accounts nur für vergleichsweise kurze Zeit aktiv waren. Auch scheint immer wieder ein kleiner Anzeigefehler aufzutauchen, dieser wirkt sich aber bei genauerer Betrachtung nicht wirklich auf die sichtbaren Ergebnisse aus.
 
+# Grafik: Zufalls-Sample von 16 Accounts:
+# vec <- sample(1:nrow(users), size = 16), Ergebnis:
+# vec <- c(1436, 1260, 2582, 728, 421, 273, 1188, 170, 945, 896, 3128, 2248, 2602, 1522, 1872, 3062)
+tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[vec]) %>%
+  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+  scale_fill_discrete(name = "Sprache", labels = c("Englisch", "Andere", "Russisch", "Undefiniert")) + 
+  labs(x = "Datum", y = "Anzahl Tweets", title = "Tweet-Sprachen 16 zufällig ausgewählter Accounts") +
+  facet_wrap(~ userid, ncol = 4, scales = "free_y") + theme_minimal()
+# Manuelle Verschiebung der Legende unter die Grafik, da theme.position = "bottom" nicht zu funktionieren scheint.
 
 ### Tweets vs. Retweets
 
