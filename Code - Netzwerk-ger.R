@@ -103,18 +103,25 @@ plot.igraph(g.dom,
             edge.width=E(g.dom)$occurances /4)
 # Accounts, denen mehr als 5 mal geantwortet wurde, finden sich alle nicht in den Daten.
 
-for.gmaxrep <- rpl_df %>% filter(to %in% rpl_dst$user[rpl_dst$occurance >= 1000])
+for.gmaxrep <- rpl_df %>% filter(to %in% rpl_dst$user[rpl_dst$occurance >= 500])
 
 g.maxrep <- graph.data.frame(for.gmaxrep, directed = T)
 g.maxrep
 V(g.maxrep)$color <- ifelse(V(g.maxrep)$name %in% rpl_src$user, "orange", "light blue")
 l <- layout_with_fr(g.maxrep)
 l <- norm_coords(l, ymin=-1, ymax=1, xmin=-1, xmax=1)
-plot.igraph(g.maxrep, layout = l * 1000, vertex.size = 5,
-            edge.width=sqrt(E(g.maxrep)$occurances))
+plot.igraph(g.maxrep, layout = l * 1000, vertex.size = 2, vertex.label.cex = 0.5,
+            edge.width=sqrt(E(g.maxrep)$occurances)/2, edge.arrow.size = 0.25)
 
-summary(E(g)$occurances)
-summary(degree(g))
+# Obwohl 95% der Antworten an Accounts außerhalb des Netzwerkes gerichtet sind, finden sich in den Accounts mit den meisten Antworten deutliche Muster:
+#   -> Die 10 Accounts außerhalb des Netzwerkes, die hier auftauchen, sind mit je ein bis drei Netzwerk-Accounts verbunden, die ihnen antworten
+#   -> mehrere dezentrale Netzwerke finden sich in den Daten, die sich relativ gleichmäßig gegenseitig antworten
+#   -> drei Accounts, der sich dominant bzw. ausschließlich selbst antwortet. Einer ist gleichzeitig Zentrum eines der
+#   -> sechs Cluster, in denen sich Accounts um einen zentralen Account scharen und diesem Antworten. Alle diese zentralen Accounts befinden sich in den Daten, und die Netzwerkgrößen schwanken deutlich (6 bis >100 Antwort-Accounts.)
+#   -> zwei der größten Cluster sind direkt über eine vergleichsweise kleine Interaktion miteinander verbunden, während zwei mittlere und ein kleiner durch eine Antort-"Achse" niteinander verbunden sind, die die stärksten Interaktionen zwischen zwei Accounts aufweist und mehrere der dezentralen Cluster mit einschließt.
+
+
+
 # Großteil der Verbindungen ziwschen Accounts nur einmalig und viele Accounts mit nur einer einzigen Verbindung, hier jedoch mehrfach auftretende Verbindungen interessant. Erste Erkenntnis - Maxima: 2011-faches Auftreten der selben Vrbindung zweier Accounts, ein einzelner Account mit 30000 replies in den Daten.
 g.mid <- graph.data.frame(rpl_df[rpl_df$from %in% rpl_sum$users[rpl_sum$replies > 1], ], directed = T)
 g.mid
