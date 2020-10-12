@@ -139,7 +139,7 @@ table(rpl_dst$user[rpl_dst$occurance == 3252] %in% rpl_src$user)
 # Dominant viele Accounts mit nur einer Antwort (verm. Spam an Accounts außerhalb der Daten, da zu 98,5% Ziel-Accounts nicht im Datensatz), teilweise Accounts mit mehreren Tausend Antworten, aber keine deutlich abgegrenzten Spitzen -> Analyse der top beantworteten Accounts für mehr Klarheit: Cutoff 500 Antworten, 38 Accounts)
 dat <- data.frame(occur = as.vector(table(rpl_dst$occurance)), 
                   interact = as.integer(names(table(rpl_dst$occurance))), 
-                  false = 0, true = 0)
+                  out.user = 0, in.user = 0)
 for(i in 1:nrow(dat)){
   ft <- table(rpl_dst$user[rpl_dst$occurance == dat$interact[i]] %in% rpl_src$user)
   names(ft)
@@ -153,7 +153,7 @@ for(i in 1:nrow(dat)){
     }
   }
 }
-dat$out_perc <- dat$false / (dat$false + dat$true) * 100
+dat$out_perc <- dat$out.user / (dat$out.user + dat$in.user) * 100
 my_breaks <- c(2, 10, 50, 250, 1000, 10000)
 ggplot(dat, aes(x = interact, y = out_perc)) + geom_point(aes(color = occur)) + scale_x_log10() +
   scale_color_gradient(name = "Anzahl an\nAccounts", trans = "log", breaks = my_breaks, low = "red", high = "green") +
