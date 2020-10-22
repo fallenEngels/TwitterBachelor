@@ -27,12 +27,11 @@ rm(packages, pkg)
   library(stm)
   
   set.seed(2020)
-  setwd("E:\\Twitter Bachelor")
+  setwd("Y:/Don/Twitter Bachelor")
 }
 
-### Der in dieser Datei präsentierte Code ist als konstant durchlaufendes Script gedacht - Vollständiges Markieren und Ausführen ist also möglich, wird aber aufgrund der voraussichtlichen Rechenzeit nicht angeraten. Da einige der im Folgenden erzeugen Dateien aus aufwändigen und/oder rechenintensiven Schritten entstehen, besteht die Möglichkeit, diese komplexeren Elemente direkt zu laden. Aus diesem Grund werden sich an einzelnen Punkten in auskommentierter Form die Codes zum Speichern und Laden von Workspace-Dateien der jeweils erzeugten Daten finden.
+### Der in dieser Datei präsentierte Code ist als konstant durchlaufendes Script gedacht - Vollständiges Markieren und Ausführen ist also möglich, wird aber aufgrund der voraussichtlichen Rechenzeit und der Dateigrößen nicht angeraten. Da einige der im Folgenden erzeugen Dateien aus aufwändigen und/oder rechenintensiven Schritten entstehen, besteht die Möglichkeit, diese komplexeren Elemente direkt zu laden. Aus diesem Grund werden sich an einzelnen Punkten in auskommentierter Form die Codes zum Speichern und Laden von Workspace-Dateien der jeweils erzeugten Daten finden.
 # Sollte man nach einer bestimmten Datei suchen, oder einen überblick über alle verfügbaren Workspace-Elemente haben wollen, so findet sich im zweiten R-Script ("Code - Data Loading.R") der Speicher- und Ladecode gebündelt und in übersichtlicher Form.
-
 
 
 # Verwendete Twitter-Datensätze ----
@@ -42,12 +41,10 @@ tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tw
 
 #tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, ursprüngliche Version vom 15.10.2018 - original für ANalysen mit aufgenommen, in Endversion des Scriptes jedoch nicht benötigt.
 
-head(as_tibble(tweets), n=20)
-# Nutzung von read_csv (readr) statt read.csv (base), da base-Funktion ohne großen Aufwand nicht zur Darstellung der unterschiedlichen Schriftsätze (westlich, kyrillisch, arabisch, ...) fähig zu sein scheint.
+# Nutzung von read_csv (readr) statt read.csv (base), da base-Funktion ohne großen Aufwand nicht zur Darstellung der unterschiedlichen Schriftsätze (westlich, kyrillisch, arabisch, ...) innerhalb einer Datei fähig zu sein scheint.
 
 # !ACHTUNG!
-# Es ist aufgrund der schieren Größe der Tweet-Datensätze (jeweils >5GB) je nach vorhandenem Arbeitsspeichers dazu zu raten, diese nur dann zu laden, wenn sie aktiv benötigt werden und nach Gebrauch zu entladen ( rm(NAME) ). Sollte dies den Speicher nicht komplett leeren, kann mit Garbage Collection oder R-Neustart nachgeholfen werden ( gc() bzw. .rs.restartR() respektive).
-
+# Es ist aufgrund der schieren Größe des Tweet-Datensatzes (>5GB) je nach vorhandenem Arbeitsspeichers dazu zu raten, diesen nur dann zu laden, wenn er aktiv benötigt wird und nach Gebrauch zu entladen ( rm(NAME) ). Sollte dies den Speicher nicht komplett leeren, kann mit einer Garbage Collection oder R-Neustart nachgeholfen werden ( gc() bzw. .rs.restartR() respektive).
 
 
 # Analyse Users: ----
@@ -56,7 +53,7 @@ head(as_tibble(tweets), n=20)
 languages <- data.frame(sort(table(users$account_language), decreasing = T))
 languages$perc <- languages$Freq / nrow(users) *100
 languages
-head(users$user_profile_description[users$account_language == "de"], 10)
+head(users$user_profile_description[users$account_language == "de"], 20)
 # Vermutlich ISO 639-1 bzw. lokalisierte (en-gb, zh-cn) Tags. Der Großteil der Accounts sind englischsprachig eingestellt, aber ein knappes Drittel gibt russisch als Sprache an. West- u. Zentraleuropäische Accounts sind die drittgrößte Gruppe (Deutschland, UK, Frankreich, Spanien, Italien) vor arabischen Accounts. Vereinzelte Chinesen, Indonesier und Ukrainer.
 
 #Aufbereitung als Data Frame, Gruppierung und Vorbereitung für Vergleich mit angegebenen Orten
@@ -64,7 +61,7 @@ lang1 <- as.character(languages[, 1])
 lang2 <- languages[, 2]
 other <- which(lang1 %in% c("zh-cn", "id"))
 europe <- which(lang1 %in% c("de","en-gb", "fr", "es", "it"))
-lang1 <- append(lang1, c("european", "others", "fantasy", "NA")) # fantasy + NA -> Platzhalter für später
+lang1 <- append(lang1, c("european", "other", "fantasy", "NA")) # fantasy + NA -> Platzhalter für später
 lang2 <- append(lang2, c(sum(lang2[europe]), sum(lang2[other]), 0, sum(is.na(users$account_language))))
 lang1 <- lang1[-c(other, europe)]
 lang2 <- lang2[-c(other, europe)]
@@ -76,8 +73,10 @@ rm(lang1, lang2, other, europe)
 loclang
 sum(loclang$language_n)
 
+
 ### Orte
 table(users$user_reported_location)
+users <- users %>% mutate(shortened_location = NA)
 #Keine eindeutige Sortierung - wie zu vermuten bei individuellen Angaben - also manuelle Nachsortierung notwendig! (Im Folgenden hinter {Klammern} versteckbar für bessere Übersicht und einfache Code-Ausführung)
 {
   users$shortened_location <- ifelse(users$user_reported_location %in% c("U.S.A", "USA", "Usa", "usa", "US", "us", "united states", "United States", "America", "AMERICA", "Amerika", "THE US", "mother America", "Murica", "Estados Unidos", "Douglas, United States"), "US", NA)
@@ -176,7 +175,8 @@ sum(is.na(users$shortened_location))
 length(grep("US,", users$shortened_location))
 length(grep("US,", users$shortened_location)) / length(grep("US", users$shortened_location)) *100
 sort(table(users$shortened_location[grep("US,", users$shortened_location)]), decreasing = T)
-# Knapp 44% der US-Amerikaner haben eine genauere Ortsngabe als nur "USA" oder vergleichbares getätigt, es lässt sich jedoch keine politische Tendenz erkennen.
+# Knapp 44% der US-Amerikaner haben eine genauere Ortsngabe als nur "USA" oder vergleichbares getätigt, es lässt sich jedoch keine politische Tendenz (Republikanisch/Demokratisch bzw. Swing States) erkennen.
+
 
 #Grouping
 arabic <- length(grep("Bahrain", users$shortened_location)) + length(grep("Egypt", users$shortened_location)) + length(grep("Lebanon", users$shortened_location)) + length(grep("Iraq", users$shortened_location)) + length(grep("Syria", users$shortened_location)) + length(grep("Jordan", users$shortened_location)) + length(grep("Saudi-Arabia", users$shortened_location)) + length(grep("Oman", users$shortened_location))
@@ -203,9 +203,10 @@ for(i in 10:18){
 }
 rm(i, q, year)
 quartals <-  quartals[1:39]
+
 ggplot(users, aes(x = account_creation_date, fill = account_language)) + geom_histogram(breaks = quartals) + 
   scale_fill_manual(name = "Sprache", values = c("#189159", "#BEA310", "#F8766D", "#D35130", "#915123", "#BE6D10",
-                                                  "#4D9E22", "#AE8046", "#619CFF", "#4A3FC6", "#00BA38"),
+                                                 "#4D9E22", "#AE8046", "#619CFF", "#4A3FC6", "#00BA38"),
                     labels = c("Arabisch", "Deutsch", "Englisch", "Englisch (GB)", "Spanisch", "Französisch",
                                "Indonesisch", "Italienisch", "Russisch", "Ukrainisch", "Chinesisch")) +
   labs(x = "Quartal", y = "Anzahl Accounts", title = "Erstelldatum aller Accounts, gruppiert nach Quartal und Account-Sprache") + theme_minimal()
@@ -216,17 +217,29 @@ table(users$account_creation_date > "2014-06-01")
 # 121 Accounts wurden vor dieser Spitze erstellt, 2078 bzw. 57,6% in dieser Spitze.
 min(users$account_creation_date); max(users$account_creation_date)
 
-
-### Aktivitäts-Zeitraum
-activity <- data.frame(userid = users$userid, cration = users$account_creation_date)
-activity <- activity %>% filter(userid %in% unique(tweets$userid))
+activity <- data.frame(userid = users$userid, cration = users$account_creation_date, tweets = 0)
 for(i in 1:nrow(users)){
   twe <- tweets %>% filter(userid == users$userid[i])
   if(nrow(twe) != 0){
-    activity[i, 3] <- min(twe$tweet_time)
-    activity[i, 4] <- max(twe$tweet_time)
+    activity[i, 3] <- nrow(twe)
+    activity[i, 4] <- as.Date(min(twe$tweet_time))
+    activity[i, 5] <- as.Date(max(twe$tweet_time))
   }
 }
+names(activity) <- c("userid", "creation", "tweets", "first.post", "last.post")
+rm(twe)
+activity <- activity %>% mutate(sleep = as.integer(first.post - creation), active = as.integer(last.post-first.post + 1))
+summary(activity$sleep)
+summary(activity$active)
+
+ggplot(activity, aes(x = active, y = sleep, color = tweets)) + geom_point() + 
+  scale_color_binned(trans = "sqrt", low = "blue", high = "red", breaks = c(1, 100, 500, 3000, 12000, 30000),
+                     name = "Anzahl an\nTweets") +
+  labs(title = "Aktivitätszeiträume der Accounts nach Zahl abgesetzter Tweets", 
+       x = "Tage an Aktivität des Accounts", y = "Tage seit Account-Erstellung bis zu erstem Post")
+
+# Über lange Zeiträume genutzte Accounts wurden meist direkt nach Ertstellung aktiv, während Accounts, die nur wenige Tage benutzt wurden eher lange auf diese kurze Aktivität "warteten" Zudem lässt sich ein beinahe viereckiger Kasten aus Accounts bis 1000 Tage Aktivität und bis 600 Tage vor erstem Post erkennen. Diese Beobachtung ist insbesondere einer Gruppe an Acocunts, die um die 500 Tage nach Erstellung aktiv wurden und in Aktivität sowie Anzahl abgesetzter Tweets stark schwanken, zu verdanken.
+# Zusätzlich lässt sich erkennen, dass Accounts mit längerer Aktivitätszeit auch im Schnitt mehr Tweets absetzen, was von einer konstanten Aktivität ausgehen lässt.
 
 
 ### Gefolgte Accounts
@@ -240,7 +253,7 @@ followbots <- followbots[, 7:8]
 followbots
 summary(lm(followbots$follower_count ~ followbots$following_count))
 summary(lm(users$follower_count ~ users$following_count))
-# Für die Accounts, die über 10.000 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für alle 3.600 Accounts die Anzahl gefolgter Accounts gut 25% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,246), ist es für die Accounts mit über 10.000 Follows eine Varianzaufklärung von über 60% (adj. R^2 = 0,611)!
+# Für die Accounts, die über 10.000 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für alle 3.608 Accounts die Anzahl gefolgter Accounts gut 25% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,246), ist es für die Accounts mit über 10.000 Follows eine Varianzaufklärung von über 60% (adj. R^2 = 0,611)!
 
 
 
@@ -249,55 +262,56 @@ summary(lm(users$follower_count ~ users$following_count))
 ### Tweet-Zeiten
 times <- tibble(dt = tweets$tweet_time %>% ymd_hms()) %>%
   mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
-ggplot(times, aes(x = timeset)) + geom_bar() + theme_minimal() + ggtitle("Tweets by UTC time, all tweets")
+ggplot(times, aes(x = timeset)) + geom_bar() + theme_minimal() + 
+  labs(title = "Tweets nach UTC-Zeit, alle Tweets", x = "Uhrzeit (Stunden)", y = "Anzahl Tweets")
 #Es gibt deutlich erkennbare Muster in den Tweetzeiten. So werden eine große Menge Tweets zwischen 07:00 und 17:00 UTC abgesetzt, während zwischen 21:00 und 06:00 UTC bedeutend weniger Tweets verfasst wurden.
 #Das bedeutet, dass die Großzahl der Tweets nach amerikanischer Sicht zwischen 03:00 und 13:00 (Ostküste) bzw. 00:00 und 10:00 (Westküste) verfasst wurden. Geht man von russischen Verfassern aus, so liegt die Hochfrequenz zwischen 10:00 und 20:00 (Moskau/St. Petersburg). Es gibt also entweder Hochzeiten während der Morgensunden in Amerika oder während den Arbeitsstunden in West-Russland.
 
 times_eng <- tweets %>% filter(tweet_language %in% c("en")) %>% tibble(dt = tweet_time %>% ymd_hms()) %>%
   mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
-ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() + ggtitle("Tweets by UTC time, english language tweets")
-# Filtert man nur nach englischsprachigen Tweets, so verschiebt sich das Maximum auf 13:00-17:00 UTC, mit einem Minimum zwischen 03:00-08:00 UTC.
-#Somit sind die Minima bei 20:00-01:00 (Westküste) und 23:00-04:00 (Ostküste), bzw. 6:00-11:00 (Moskau) und die Maxima bei 06:00-01:00 (Westküste) und 09:00-04:00 (Ostküste), bzw. 16:00-11:00 (Moskau).
+ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() + 
+  labs(title = "Tweets nach UTC-Zeit, englischsprachige Tweets", x = "Uhrzeit (Stunden)", y = "Anzahl Tweets")
+# Filtert man nur nach englischsprachigen Tweets, so verschiebt sich das Maximum auf 13:00-17:00 UTC, mit einem Minimum zwischen 03:00-07:00 UTC.
+#Somit sind die Minima bei 20:00-01:00 (Westküste) und 23:00-04:00 (Ostküste), bzw. 6:00-11:00 (Moskau) und die Maxima bei 06:00-01:00 (Westküste) und 09:00-04:00 (Ostküste), bzw. 16:00-21:00 (Moskau).
 
 
 ### Tweet-Sprachen nach Account
 
 # Analyse der Anzahl englisch-/russischsprachiger Tweets für alle Accounts in den Daten, um nach sprachlicher EInheitlichkeit oder systematischen Veränderungen zu suchen. Aufgrund der großen Account-Anzahl (3608) aufgesplittet in mehrere Plots. Sollte sich im Plot-Fenster nach Ausführen des Print-Befehls kein Ergebnis zeigen, so kann es helfen, dieses zu vergrößern. Eine tatsächliche Analyse der Grafiken ist in RStudio selbst nicht möglich, die Dateien können jedoch als PDF exportiert und dann betrachtet werden - Exportmaße von ca. 40x80″ werden empfohlen.
 {
-langplot_1 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1:600]) %>%
-  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-langplot_2 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[601:1200]) %>%
-  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-langplot_3 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1201:1800]) %>%
-  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-langplot_4 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1801:2400]) %>%
-  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-langplot_5 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[2401:3000]) %>%
-  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[3001:3608]) %>%
-  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-  scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-  theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-}
+  langplot_1 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1:600]) %>%
+    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
+  langplot_2 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[601:1200]) %>%
+    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
+  langplot_3 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1201:1800]) %>%
+    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
+  langplot_4 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1801:2400]) %>%
+    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
+  langplot_5 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[2401:3000]) %>%
+    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
+  langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[3001:3608]) %>%
+    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
+    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
+    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
+    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
+  }
 # save("Saved Files/user-languages_ggplot.RData")
 # DATEIEN LADEN: load("Saved Files/user-languages_ggplot.RData")
-
 
 print(langplot_1)
 print(langplot_2)
@@ -305,11 +319,12 @@ print(langplot_3)
 print(langplot_4)
 print(langplot_5)
 print(langplot_6)
+rm(langplot_1, langplot_2, langplot_3, langplot_4, langplot_5, langplot_6)
 # Relative Einheitlichkeit über die Zeit für alle Accounts. Vereinzelte russische Tweets in dominant englischen Accounts und anders herum, aber keine systemischen Veränderungen sichtbar. Zusätzlich zeigt sich, dass viele Accounts nur für vergleichsweise kurze Zeit aktiv waren. Auch scheint immer wieder ein kleiner Anzeigefehler aufzutauchen, dieser wirkt sich aber bei genauerer Betrachtung nicht wirklich auf die sichtbaren Ergebnisse aus.
 
 # Grafik: Zufalls-Sample von 16 Accounts:
 # vec <- sample(1:nrow(users), size = 16), Ergebnis:
-# vec <- c(1436, 1260, 2582, 728, 421, 273, 1188, 170, 945, 896, 3128, 2248, 2602, 1522, 1872, 3062)
+vec <- c(1436, 1260, 2582, 728, 421, 273, 1188, 170, 945, 896, 3128, 2248, 2602, 1522, 1872, 3062)
 tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[vec]) %>%
   mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
   ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
@@ -317,6 +332,7 @@ tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% 
   labs(x = "Datum", y = "Anzahl Tweets", title = "Tweet-Sprachen 16 zufällig ausgewählter Accounts") +
   facet_wrap(~ userid, ncol = 4, scales = "free_y") + theme_minimal()
 # Manuelle Verschiebung der Legende unter die Grafik, da theme.position = "bottom" nicht zu funktionieren scheint.
+
 
 ### Tweets vs. Retweets
 
@@ -341,30 +357,28 @@ user_rts <- user_rts[!(is.nan(user_rts$rtpercent)), ]
 
 user_rts %>% ggplot(aes(x = rtpercent)) + geom_histogram(bins = 100) + 
   labs(x = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users") +
-  theme_minimal()
+  theme_minimal() + scale_y_continuous(trans = "sqrt")
 #Die große Mehrheit der Accounts setzt auf eigene Postings und wenige bis gar keine Retweets, während einige Accounts nur aus Retweets zu bestehen scheinen. Auffällig ist auch eine Ansammlung an Accounts um die 85-90% Retweet-Rate.
 
 user_rts %>% ggplot(aes(x = followers, y = rtpercent)) + geom_point() + 
-  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma) +
+  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "sqrt") +
   labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
-       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") +
-  theme_minimal()
+       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") + theme_minimal()
 # Accounts mit vielen Followern (fünfstellig und aufwärts) setzen hauptsächlich auf eigene Tweets und retweeten wenig. Mit zunehmender Follower-Zahl gent die Anzahl an Retweets weiter zurück.
 user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = rtpercent)) + geom_point() + 
-  scale_x_log10(name = "Follower-Zahl (log10)", labels = scales::comma) +
+  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "log") +
   labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
-       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") +
-  theme_minimal()
+       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") + theme_minimal()
 # Es zeigt sich kein deutlicher Unterschied in der Follower-Zahl zwischen den Gruppen mit beinahe gar keinen Retweets und der Gruppe mit fast ausschließlich Retweets. Um die 100 Follower herum findet sich zusätzlich noch eine kleine Gruppe an Accounts mit 55-65% Retweet-Anteil.
 
 user_rts %>% ggplot(aes(x = postcount, y = rtpercent)) + geom_point() + 
-  scale_x_continuous(name = "Posting-Anzahl", labels = scales::comma) +
+  scale_x_continuous(name = "Posting-Anzahl", labels = scales::comma, trans = "sqrt") +
   labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
        subtitle = "Aufgeteilt nach Posting-Anzahl des Nutzers") +
   theme_minimal()
 # Der Account, der mit ABstand die meisten Postings veröffentlicht hat, hat dies zu großen Teilen durch Retweets bewerkstelligt. Die nächstgrößeren Accounts mit 50.000+ Posts retweeten dagegen jedoch kaum bzw. zu großen Teilen quasi gar nicht. -> Nachrichtenseiten, die eigene Artikel teilen?
 user_rts %>% ggplot(aes(x = postcount, y = rtpercent, color = rtpercent)) + geom_point() + 
-  scale_x_log10(name = "Posting-Anzahl (log10)", labels = scales::comma) +
+  scale_x_continuous(name = "Posting-Anzahl", labels = scales::comma, trans = "log") +
   labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
        subtitle = "Aufgeteilt nach Posting-Anzahl des Nutzers") +
   theme_minimal()
@@ -373,7 +387,7 @@ user_rts %>% ggplot(aes(x = postcount, y = rtpercent, color = rtpercent)) + geom
 
 # Cleanup Data Sets ----
 
-### Sprache: Da es hier um die Beeinflussung der USA gehen soll, sind nur englischsprachige Tweets von Interesse - Der ANteil von Amerikanern, die russisch, ukrainisch oder eine der anderen Sprachen beherrschen und auf zufällig aufauchende Tweets in diesen Sprachen reagieren sollte nicht ausreichen, um einen bedeutenden Einfluss zu entwickeln.
+### Sprache: Da es hier um die Beeinflussung der USA gehen soll, sind nur englischsprachige Tweets von Interesse - Der Anteil von Amerikanern, die russisch, ukrainisch oder eine der anderen Sprachen beherrschen und auf zufällig aufauchende Tweets in diesen Sprachen reagiert sollte nicht ausreichen, um einen bedeutenden Einfluss zu entwickeln.
 tweets_eng <- tweets %>% filter(tweet_language %in% c("en"))
 rm(tweets)
 
