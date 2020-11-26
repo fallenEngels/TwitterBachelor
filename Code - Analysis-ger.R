@@ -660,7 +660,7 @@ ggplot(tweets_stm, aes(x = max.topic, y = max_prop, group = max.topic, fill = co
   scale_y_continuous(breaks = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)) + theme_minimal() + 
   scale_fill_continuous(trans = "sqrt",labels = scales::number, breaks = c(1000, 10000, 50000, 100000),
                         name = "Anzahl\nan Tweets\nje Topic", low = "dark red", high = "white")
-# Auch wenn alle Topics Tweets mit thetha-Werten über das gesamte Spektrum beinhalten, finden sich doch einige Topics mit deutlich höheren Werten - 4 der Topics haben sogar einen Median von über 0.5.
+# Auch wenn alle Topics Tweets mit thetha-Werten über das gesamte Spektrum beinhalten, finden sich doch einige Topics mit deutlich höheren Werten - 4 der Topics haben sogar einen Median von über 0,5.
 
 # write_csv(tweets_stm, file.path("Other Files/tweets_stm.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
 # DATEIEN LADEN: tweets_stm <- read_csv("Other Files/tweets_stm.csv", col_types = cols(tweetid = col_character(), in_reply_to_tweetid = col_character(), quoted_tweet_tweetid = col_character()))
@@ -671,22 +671,23 @@ tweets_stm <- tweets_stm %>% mutate(interactions = retweet_count + like_count + 
   mutate(inter.grp = ifelse(interactions > 0, "c1-100 Interaktionen", "dKeine Interaktionen")) %>% 
   mutate(inter.grp = ifelse(interactions > 100, "b>100-1000 Interaktionen", inter.grp)) %>% 
   mutate(inter.grp = ifelse(interactions > 1000, "a>1000 Interaktionen", inter.grp))
-for.plot <- tweets_stm %>% select(c(max.topic, topic_grp, inter.grp, interactions)) %>% mutate(max.topic = as.factor(max.topic)) %>%
+for.plot <- tweets_stm %>% select(c(max.topic, topic_grp, inter.grp, interactions)) %>% mutate(max.topic = as.integer(max.topic)) %>%
   mutate(topic_grp = ifelse(topic_grp %in% c("News", "Person", "Spam"), topic_grp, "Undefiniert (mehrere)"))
 
 for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) + theme_minimal() + 
   scale_y_continuous(labels = scales::number, breaks = c(0, 25000, 50000, 75000, 100000, 125000)) + 
-  scale_x_discrete(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) +
   scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
   labs(title = "Anzahl an Interaktionen je Tweet und Topic", x = "Topic-Nummer", y = "Anzahl an Tweets je Topic",
        subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
-
+# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen- SPam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten.
+# Zusäzlich lässt sich festhalten, dass die meisten Tweets keine einzige Interaktion aufweisen, und nur eine sehr kleine Minderheit mehr als 100 Interaktionen ansammeln konnte.
 for.plot %>% filter(interactions > 1000) %>% ggplot(aes(x = max.topic, y = interactions)) + geom_boxplot() +
   scale_y_continuous(trans = "log", labels = scales::number, breaks = c(2000, 6000, 20000, 60000, 200000)) + 
   theme_minimal() + facet_wrap(~ topic_grp, nrow = 4) +
   scale_x_discrete(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
   labs(title = "Anzahl an Tweet-Interaktionen je Topic", x = "Topic-Nummer", y = "Anzahl an Interaktionen je Tweet")
-
+# Das bedeutet jedoch nicht, dass die Topics sich strukturell in ihren Reichweite-Potenzialen unterscheiden. Ein sehr großer Anteil an Topics aus allen Bereichen weist Tweets mit mehr als 50.000 Interaktionen auf.
 
 topic_df <- data.frame(topic = paste0("topic_", label_csv$Number), group = label_csv$Group)
 for(i in 1:nrow(topic_df)){
@@ -736,7 +737,25 @@ for(i in 1:nrow(topic_df)){
 topic_df$min_time <- as.Date(topic_df$min_time, origin="1970-01-01")
 topic_df$max_time <- as.Date(topic_df$max_time, origin="1970-01-01")
 
+news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
+news_top68$tweet_text[sample(1:nrow(news_top68), 50)]
+head(news_top68$tweet_text, 50)
+# Während sich das Topic aus allen möglichen Nachrichtenmeldungen zu Kriminalität und Unfällen besteht, finden sich in den Top-Tweets zwei  gegensätzliche Strömungen: Zum Einen Pro-Polizei-Berichte zu muslimischen Tätern und terroristischen Anschlägen, insbesondere in Europa und zum Anderen Anti-Polizei-Berichte zu übermäßigem Gewalteinsatz von US-Polizisten insbesondere gegen schwarze Bürger. Es zeigt sich also bereits hier der Ansatz einer Aufspaltung in rechte/linke Echokammern
+news_top68_subL <- news_top68[grepl("black", news_top68$tweet_text, ignore.case = T),]
+news_top68_subR <- news_top68[grepl("muslim|refugee|paris|manchester|europe", news_top68$tweet_text, ignore.case = T),]
+table(unique(news_top68_subL$userid) %in% news_top68_subR$userid)
+table(unique(news_top68_subR$userid) %in% news_top68_subL$userid)
+# Etwa die Hälfte der Accounts mit "linken" Themen bedienen auch "rechte" Themen, während fast alle Accounts mit "rechten" Themen auch "linke" Themen bedienen.
+
+# Interaktionen mit diesen Tweets
+
+
+
+# Max.Theta-Filter (EXPERIMENTELL)
+tweets_stm <- tweets_stm %>% mutate(max.topic = ifelse(max_prop >= 0.15, max.topic, 99)) %>%
+  mutate(topic_grp = ifelse(max.topic == 99, "undef", topic_grp))
 
 
 tweets_stm %>% ggplot(aes(x = interactions)) + geom_histogram(bins = 70) + 
   scale_x_continuous(trans = "sqrt") + scale_y_continuous(trans = "sqrt")
+asd
