@@ -35,9 +35,9 @@ rm(packages, pkg)
 
 
 # Verwendete Twitter-Datensätze ----
-users <- read_csv("Twitter Data/ira_users_csv_hashed.csv") # Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
+users <- as.data.frame(read_csv("Twitter Data/ira_users_csv_hashed.csv")) # Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
 
-tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
+tweets <- as.data.frame(read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))) # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
 
 #tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, ursprüngliche Version vom 15.10.2018 - original für ANalysen mit aufgenommen, in Endversion des Scriptes jedoch nicht benötigt.
 
@@ -46,6 +46,8 @@ tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tw
 # !ACHTUNG!
 # Es ist aufgrund der schieren Größe des Tweet-Datensatzes (>5GB) je nach vorhandenem Arbeitsspeichers dazu zu raten, diesen nur dann zu laden, wenn er aktiv benötigt wird und nach Gebrauch zu entladen ( rm(NAME) ). Sollte dies den Speicher nicht komplett leeren, kann mit einer Garbage Collection oder R-Neustart nachgeholfen werden ( gc() bzw. .rs.restartR() respektive).
 
+# !ACHTUNG 2!
+# Es kann scheinbar bei der Nutzung von dplyr vorkommen, dass scheinbar zufällige Befehle die Warnmeldungen "Unknown or uninitialized column" produzieren. Diese Warnmeldung sollte jedoch im Normalfall zu ignorieren sein und hat nichts mit dem ausgeführten Befehl zu tun: https://github.com/tidyverse/tibble/issues/450 
 
 # Analyse Users: ----
 
@@ -141,7 +143,7 @@ users <- users %>% mutate(shortened_location = NA)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Russia, Moscow", "moscow city", "Moscow-City", "Moscow", "msk", "Msk", "MSK", "MSK SAO", "★москва", "Moscow, Russia", "moscow", "Москва♥", "Москоу-сити", "осква, Россия", "Москва Златоглавая", "Москва Белокаменная", "Москва (СССР - Россия)", "Москва - столица", "Москва - Самара", "Москва - Лондон", "Москва", "Моска", "мск", "москва", "Туапсе, Москва", "Серпухов", "Севастополь", "Россия, Москва", "Пушкино", "Псков", "Подольск", "Одинцово", "Москва, Россия", "МСКВА", "МСК", "Коломна", "Перово", "МSK", "Дмитров"), "Russia, Moscow", users$shortened_location) # Moskau-Stadt + Oblast
   users$shortened_location <- ifelse(users$user_reported_location %in% c("St-Petersburg", "St. Petersburg", "st.petersburg", "St.Petersburg", "st/petersburg", "Saint Petersburg, Russia", "Saint Petersburg", "saint-petersburg", "Saint-Peterburg", "saint P.", "saint p.", "Saint-P.", "Saint-P", "St.P", "St.P.", "St-P", "SPb♥○•°•☆", "SPB", "SPb", "spb", "cанкт-петербург", "спб", "Спб", "Сестрорецк, Россия", "Санкт-петербург", "Санкт-Петербург, Россия", "Россия Санкт-Петербург", "Санкт-Петербург", "СПб", "СПБГПУ", "СПБ", "С.Петербург", "С-Пб", "Пушкин, Санкт-Петербург", "Пушкин", "ПЕТЕРБУРГ", "Лос-Питербургос", "Ленинград", "Кронштадт", "Кингисепп", "Петроград", "Петербург", "Выборг"), "Russia, St.Petersburg", users$shortened_location) # St.Petersburg + Oblast Leningrad
   # Sonstige Länder
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Kiel, Schleswig-Holstein", "Köln, Deutschland.", "Hessen, Deutschland", "Hamburg, Deutschland", "Frankfurt am Main, Deutschland", "Frankfurt am Main, Hessen", "Erfurt, Deutschland", "Düsseldorf, Deutschland", "Dresden, Sachsen", "Bremen, Deutschland", "Berlin, Deutschland", "Stuttgart, Deutschland", "Rostock, Deutschland", "Saarbrücken, Deutschland", "Deutschland", "München, Bayern", "Magdeburg, Deutschland", "Köln, Deutschland", "Потсдам"), "Germany", users$shortened_location)
+  users$shortened_location <- ifelse(users$user_reported_location %in% c("Kiel, Schleswig-Holstein", "Köln, Deutschland", "Hessen, Deutschland", "Hamburg, Deutschland", "Frankfurt am Main, Deutschland", "Frankfurt am Main, Hessen", "Erfurt, Deutschland", "Düsseldorf, Deutschland", "Dresden, Sachsen", "Bremen, Deutschland", "Berlin, Deutschland", "Stuttgart, Deutschland", "Rostock, Deutschland", "Saarbrücken, Deutschland", "Deutschland", "München, Bayern", "Magdeburg, Deutschland", "Köln, Deutschland", "Потсдам"), "Germany", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("UK", "Newcastle", "Newport", "Manchester", "London", "London, England", "London, UK", "Liverpool", "Coventry"), "United Kingdom", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Italy", "Italia", "italia", "Milano, Lombardia", "Itala, Sicilia"), "Italy", users$shortened_location)
   users$shortened_location <- ifelse(users$user_reported_location %in% c("Paris", "Paris, France", "Lyon"), "France", users$shortened_location)
@@ -185,7 +187,7 @@ westeuro <- length(grep("Belgium", users$shortened_location)) + length(grep("Fra
 other <- length(grep("Azerbaijan", users$shortened_location)) + length(grep("Nepal", users$shortened_location)) + length(grep("North Korea", users$shortened_location)) + length(grep("Philippines", users$shortened_location)) + length(grep("Turkey", users$shortened_location)) + length(grep("Zambia", users$shortened_location))
 
 loc1 <- c("US", "Russia", "Arabic", "East Europe", "West Europe", "other", "Fantasy", "NA")
-loc2 <- c(length(grep("US", users$shortened_location)), length(grep("Russia", users$shortened_location)), arabic, easteuro, westeuro, other, (length(grep("Unidentified", users$shortened_location)) + length(grep("Fantasy", users$shortened_location))), sum(is.na(users$shortened_location)))
+loc2 <- c(length(grep("US", users$shortened_location)), length(grep("Russia", users$shortened_location)), arabic, easteuro, westeuro, other, (length(grep("Unidentified", users$shortened_location)) + length(grep("Fantasy", users$shortened_location)) + length(grep("Other", users$shortened_location))), sum(is.na(users$shortened_location)))
 loclang <- loclang %>% mutate(location = loc1, location_n = loc2)
 rm(arabic, easteuro, westeuro, other, loc1, loc2)
 loclang$location_perc <- loclang$location_n / nrow(users) *100
@@ -232,11 +234,14 @@ activity <- activity %>% mutate(sleep = as.integer(first.post - creation), activ
 summary(activity$sleep)
 summary(activity$active)
 
-ggplot(activity, aes(x = active, y = sleep, color = tweets)) + geom_point() + 
+ggplot(activity, aes(x = active, y = sleep, color = tweets)) + geom_point() + theme_minimal() +
+  scale_x_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 2000, 3000)) + 
+  scale_y_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 1500, 2000)) + 
   scale_color_binned(trans = "sqrt", low = "blue", high = "red", breaks = c(1, 100, 500, 3000, 12000, 30000),
                      name = "Anzahl an\nTweets") +
   labs(title = "Aktivitätszeiträume der Accounts nach Zahl abgesetzter Tweets", 
        x = "Tage an Aktivität des Accounts", y = "Tage seit Account-Erstellung bis zu erstem Post")
+# Missing Rows: Accounts ohne einen einzigen abgesetzten Tweet
 
 # Über lange Zeiträume genutzte Accounts wurden meist direkt nach Ertstellung aktiv, während Accounts, die nur wenige Tage benutzt wurden eher lange auf diese kurze Aktivität "warteten" Zudem lässt sich ein beinahe viereckiger Kasten aus Accounts bis 1000 Tage Aktivität und bis 600 Tage vor erstem Post erkennen. Diese Beobachtung ist insbesondere einer Gruppe an Acocunts, die um die 500 Tage nach Erstellung aktiv wurden und in Aktivität sowie Anzahl abgesetzter Tweets stark schwanken, zu verdanken.
 # Zusätzlich lässt sich erkennen, dass Accounts mit längerer Aktivitätszeit auch im Schnitt mehr Tweets absetzen, was von einer konstanten Aktivität ausgehen lässt.
@@ -248,11 +253,13 @@ hist(log2(users$following_count))
 summary(users$following_count)
 # Ein Großteil der Accounts folgt nur ein paar Hundert Accounts (wenn überhaupt), während einige wenige Accounts mehreren zehntausend Accounts folgen -> Wahrscheinlich Nutzung von Follow-Bots, um Nummern zu erhöhen.
 
-followbots <- users[which(users$following_count >= 10000), ]
+followbots <- users[which(users$following_count >= 5000), ]
 followbots <- followbots[, 7:8]
 followbots
+nobots <- users[which(users$following_count < 5000), ]
+nobots <- nobots[, 7:8]
 summary(lm(followbots$follower_count ~ followbots$following_count))
-summary(lm(users$follower_count ~ users$following_count))
+summary(lm(nobots$follower_count~ nobots$following_count))
 # Für die Accounts, die über 10.000 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für alle 3.608 Accounts die Anzahl gefolgter Accounts gut 25% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,246), ist es für die Accounts mit über 10.000 Follows eine Varianzaufklärung von über 60% (adj. R^2 = 0,611)!
 
 
@@ -269,8 +276,11 @@ ggplot(times, aes(x = timeset)) + geom_bar() + theme_minimal() +
 
 times_eng <- tweets %>% filter(tweet_language %in% c("en")) %>% tibble(dt = tweet_time %>% ymd_hms()) %>%
   mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
-ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() + 
-  labs(title = "Tweets nach UTC-Zeit, englischsprachige Tweets", x = "Uhrzeit (Stunden)", y = "Anzahl Tweets")
+ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22),
+                     labels = c("00:00", "02:00", "04:00", "06:00", "08:00", "10:00", 
+                                "12:00", "14:00", "16:00", "18:00", "20:00", "22:00")) +
+  labs(title = "Tweets nach Uhrzeit, englischsprachige Tweets", x = "Uhrzeit (UTC)", y = "Anzahl Tweets")
 # Filtert man nur nach englischsprachigen Tweets, so verschiebt sich das Maximum auf 13:00-17:00 UTC, mit einem Minimum zwischen 03:00-07:00 UTC.
 #Somit sind die Minima bei 20:00-01:00 (Westküste) und 23:00-04:00 (Ostküste), bzw. 6:00-11:00 (Moskau) und die Maxima bei 06:00-01:00 (Westküste) und 09:00-04:00 (Ostküste), bzw. 16:00-21:00 (Moskau).
 
@@ -360,29 +370,25 @@ user_rts %>% ggplot(aes(x = rtpercent)) + geom_histogram(bins = 100) +
   theme_minimal() + scale_y_continuous(trans = "sqrt")
 #Die große Mehrheit der Accounts setzt auf eigene Postings und wenige bis gar keine Retweets, während einige Accounts nur aus Retweets zu bestehen scheinen. Auffällig ist auch eine Ansammlung an Accounts um die 85-90% Retweet-Rate.
 
-user_rts %>% ggplot(aes(x = followers, y = rtpercent)) + geom_point() + 
+user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = postcount)) + geom_point() + 
+  scale_color_continuous(trans = "sqrt") +
   scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "sqrt") +
   labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
        subtitle = "Aufgeteilt nach Followerzahl des Nutzers") + theme_minimal()
 # Accounts mit vielen Followern (fünfstellig und aufwärts) setzen hauptsächlich auf eigene Tweets und retweeten wenig. Mit zunehmender Follower-Zahl gent die Anzahl an Retweets weiter zurück.
+
 user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = rtpercent)) + geom_point() + 
   scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "log") +
   labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
        subtitle = "Aufgeteilt nach Followerzahl des Nutzers") + theme_minimal()
 # Es zeigt sich kein deutlicher Unterschied in der Follower-Zahl zwischen den Gruppen mit beinahe gar keinen Retweets und der Gruppe mit fast ausschließlich Retweets. Um die 100 Follower herum findet sich zusätzlich noch eine kleine Gruppe an Accounts mit 55-65% Retweet-Anteil.
-
-user_rts %>% ggplot(aes(x = postcount, y = rtpercent)) + geom_point() + 
-  scale_x_continuous(name = "Posting-Anzahl", labels = scales::comma, trans = "sqrt") +
-  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
-       subtitle = "Aufgeteilt nach Posting-Anzahl des Nutzers") +
-  theme_minimal()
 # Der Account, der mit ABstand die meisten Postings veröffentlicht hat, hat dies zu großen Teilen durch Retweets bewerkstelligt. Die nächstgrößeren Accounts mit 50.000+ Posts retweeten dagegen jedoch kaum bzw. zu großen Teilen quasi gar nicht. -> Nachrichtenseiten, die eigene Artikel teilen?
 user_rts %>% ggplot(aes(x = postcount, y = rtpercent, color = rtpercent)) + geom_point() + 
   scale_x_continuous(name = "Posting-Anzahl", labels = scales::comma, trans = "log") +
   labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
        subtitle = "Aufgeteilt nach Posting-Anzahl des Nutzers") +
   theme_minimal()
-# Accounts mit vielen Postings scheinen mehr zu Retweeten als andere Accounts, auch wenn sich kein deutlicher Unterschied abzeichnet.
+# Accounts mit mittel-vielen Postings scheinen mehr zu Retweeten als andere Accounts, auch wenn sich kein deutlicher Unterschied abzeichnet.
 
 
 # Cleanup Data Sets ----
@@ -462,11 +468,11 @@ docvars(dtm, "retweetcount") <- tweets_clean$retweet_count
 stm_dtm <- convert(dtm, to = "stm")
 # Durch das Entfernen von Stopwords werden ca. 2.000 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt.
 
+# save(stm_dtm, file = "Saved Files/stm_dtm.RData")
+# DATEN LADEN: load("Saved Files/stm_dtm.RData")
 used_documents <- names(stm_dtm$documents)
 used_documents <- used_documents %>% gsub("^text", "", .) %>% as.integer(.)
 
-# save(stm_dtm, file = "Saved Files/stm_dtm.RData")
-# DATEN LADEN: load("Saved Files/stm_dtm.RData")
 rm(dtm, toks)
 
 
@@ -480,18 +486,26 @@ select_k <- searchK(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
 # save(select_k, file = "Saved Files/selectK.RData")
 # DATEN LADEN: load("Saved Files/selectK.RData")
 plot(select_k)
-selectk_df <- data.frame(K = unlist(select_k$results$K), exclus = unlist(select_k$results$exclus), semcoh = unlist(select_k$results$semcoh),
-                         heldout = unlist(select_k$results$heldout), residual = unlist(select_k$results$residual),
-                         bound = unlist(select_k$results$bound), lbound = unlist(select_k$results$lbound), em.its = unlist(select_k$results$em.its))
-selectk_df %>% select(K, semcoh, exclus, heldout, em.its) %>%
-  pivot_longer(-K, names_to = "measure", values_to = "value") %>%
+selectk_df <- data.frame(K = unlist(select_k$results$K), exclus = unlist(select_k$results$exclus),
+                         semcoh = unlist(select_k$results$semcoh), heldout = unlist(select_k$results$heldout),
+                         residual = unlist(select_k$results$residual), bound = unlist(select_k$results$bound),
+                         lbound = unlist(select_k$results$lbound), em.its = unlist(select_k$results$em.its))
+k_diff <- data.frame(K = selectk_df$K[2:11], Iterationen = selectk_df$em.its[2:11])
+for(i in 1:10){
+  k_diff$Exklusivität[i] <- selectk_df$exclus[i+1] - selectk_df$exclus[i]
+  k_diff$Kohärenz[i] <- selectk_df$semcoh[i+1] - selectk_df$semcoh[i]
+  k_diff$Heldout[i] <- selectk_df$heldout[i+1] - selectk_df$heldout[i]
+}
+
+k_diff %>% pivot_longer(-K, names_to = "measure", values_to = "value") %>%
   ggplot(aes(x = K, y = value, group = measure, color = measure)) +
-  geom_line() +  facet_wrap(.~measure, scale = "free", ncol = 2) +
-  labs(y = "", title = "Exklusivität und semantische Kohärenz für K Topics", subtitle = "Bei einem Test mit max. 10 Iterationen") +
+  geom_line() + facet_wrap(.~measure, scale = "free", ncol = 5) +
+  labs(y = "Veränderung zu K-10", title = "Interne Validität unterschiedlicher Topic-Anzahlen (K)", 
+       subtitle = "bei Tests mit max. 10 Iterationen") +
   theme_minimal() +
   theme(legend.position="none")
 # Residuen-Spike bei 100 Topics, lbound-Minimum bei 90 Topics, Iteraionen: Ab 70 Topics Konvergenz bei unter 10 Iterationen, Exklusivität: Plateau ab ca. 60 Topics mit lok. Minimum bei 80, Kohärenz-Beuge ab 70  Topics, Verbesserung der Heldout-Likelihood bei 80 Topics, Plateau bei 90/100 Topics -> 90 Topics erscheinen als beste Wahl
-
+rm(k_diff, select_k, selectk_df)
 
 # STM - Interpretation ----
 
@@ -520,7 +534,7 @@ rm(labels, prob, frex, i)
 # Kodierungsregeln:
 # - 3 Hauptkategorien: News, Person, Spam
 #   -> News: Sachlich formulierte Sätze zu aktuellem Geschehen, wie sie sich bei Tweets von Nachrichtenorganisationen zu neuen Themen finden könnten. Das heißt nicht, dass alle diese Tweets tatsächlich von diesen Organisationen kommen, nur, dass keine Wertung aus dem Tweet klar ersichtlich wird.
-#   -> Spam: Tweets, die "normale Menschen" vermutlich nicht posten würden: Entweder, weil der Tweet selbst durch übermäßiges Taggen anderer Nutzer auffällt, eine bedeutende Menge an Emoji beinhaltet (wobei hier der genaue Umbruchpunkt rein subjektiv ist und in meinen Augen  zwischen 4-5 liegt) oder ähnliches Verhalten an den Tag legt. Auf Topic-Ebene: Tweets, die zwar individuell "normal" erscheinen, sich aber über mehrere Tweets hinweg deutlich in Formulierungen und Satzstrukturen ähneln, sodass von einer gemeinsamen Quelle mit speziefischem Ziel ausgegangen werden kann. Bei Spam zu politischen Themen wird zudem eine vermutende Eingruppierung in rechte / linke Ideen und Positionen unterschieden.
+#   -> Spam: Tweets, die "normale Menschen" vermutlich nicht posten würden: Entweder, weil der Tweet selbst durch übermäßiges Taggen anderer Nutzer auffällt, eine bedeutende Menge an Emoji beinhaltet (wobei hier der genaue Umbruchpunkt rein subjektiv ist und in meinen Augen  zwischen 4-5 liegt) oder ähnliches Verhalten an den Tag legt. Auf Topic-Ebene: Tweets, die zwar individuell "normal" erscheinen, sich aber über mehrere Tweets hinweg deutlich in Formulierungen und Satzstrukturen ähneln, sodass von einer gemeinsamen Quelle mit spezifischem Ziel ausgegangen werden kann. Bei Spam zu politischen Themen wird zudem eine vermutende Eingruppierung in rechte / linke Ideen und Positionen unterschieden.
 #   -> Person: Tweets über private Angelegenheiten, Zitate, Nachrichtenvermittlung mit wertender Einordnung; Tweets wie sie ein "normaler Mensch" schreiben könnte.
 # - Zusätzlich zu dieser groben Einteilung werden auch die jeweils behandelten Themenkomplexe (z.B. Sportnachrichten, Spam-Werbung für ein bestimmtes Produkt, Persönliche Tweets zu Workoutroutinen, ...) erfasst und aufgelistet, um deren Anteil und Verteilung untersuchen zu können.
 # - Auch bestimmte Worte, die sich durch die Tweets ziehen, werden festgehalten, da diese die einzelnen Topics erklären können. Sie werden mit Anführungszeichen als vorkommende Worte im Gegensatz zu abgeleiteten Überschriften markiert.
@@ -536,7 +550,7 @@ top <- 90 #Zu betrachtendes Topic
   thought <- findThoughts(stm_model_90, n = 20, topics = top, text = tweets_clean$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " "))
 }
-# Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.
+# Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein .PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.
 
 # Die Topics mit dem größten erwarteten Anteil drehen sich um lokale Verbrechen (Top. 68, Platz 1), Sport (Top. 71, Platz 2) und Gerichte und -entscheidungen (Top. 66, Platz 3). ALl diese Topics wurden als "News" deklariert. Das erste "Person"-Topic liegt auf Platz 4 (Top. 2, "Workout"), das erste Spam-Topic auf Platz 9 (Top. 39, Ukraine-Verschwörungstheorie).
 rm(thought, top)
@@ -581,11 +595,11 @@ topic_times <- topic_times %>% mutate(count = counts[,2])
 
 topic_times.long <- reshape2::melt(topic_times, id.vars = c("date", "count"))
 ggplot(topic_times.long, aes(x = date, y = value * count, group = variable, color = variable)) +
-  geom_line() + theme(legend.position = "bottom") + 
-  geom_line(aes(x = date, y = count), color = "black") +
+  geom_line() + geom_line(aes(x = date, y = count), color = "black") +
   scale_y_sqrt() + theme_minimal() +
   labs(title = "Topic-Anteile gemittelt nach Woche", y = "Anzahl an Tweets", x = "Kalenderwoche") +
-  theme(axis.text.x = element_text(angle = 90), legend.position = "none")
+  scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 2)]) +
+  theme(axis.text.x = element_text(size = 9, angle = 90), legend.position = "none")
 
 # Gruppiert nach Themenkomplex
 topic_grp <- topic_times %>% select(-c(date, count))
@@ -603,8 +617,126 @@ ggplot(topic_grp.long, aes(x = date, y = value, group = variable, color = variab
   geom_line() + theme(legend.position = "bottom") + 
   labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
   theme(axis.text.x = element_text(angle = 90)) + theme_minimal()
-ggplot(topic_grp.long, aes(x = date, y = value, group = variable, fill = variable)) + 
-  geom_bar(position="stack", stat="identity") + theme(legend.position = "bottom") + 
-  labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme_minimal()
 
+ggplot(topic_grp.long, aes(x = date, y = value * 100, fill = variable)) + 
+  geom_bar(position="stack", stat="identity") + theme_minimal() + 
+  scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 2)]) +
+  labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
+  theme(axis.text.x = element_text(size = 9, angle = 90), legend.position = "bottom")
+
+# Rückbezug auf Accounts ----
+
+# Cleaning, um nur tatsächlich genutzte Dokumente zu analysieren
+tweets_stm <- tweets_clean[used_documents, ]
+length(unique(tweets_stm$userid))
+length(unique(tweets_clean$userid))
+rm(tweets_clean)
+
+tweets_stm <- tweets_stm %>% 
+  select(c(tweetid, userid, tweet_text, tweet_time, in_reply_to_tweetid, in_reply_to_userid, quoted_tweet_tweetid, 
+           quote_count, reply_count, like_count, retweet_count, hashtags, urls, user_mentions)) %>%
+  mutate(max.topic = 0, topic_grp = "", max_prop = 0, colour_scale = 0)
+
+for(i in 1:nrow(tweets_stm)){
+  tweets_stm[i, 15] <- which(stm_model_90$theta[i, ] == max(stm_model_90$theta[i, ]))
+  tweets_stm[i, 16] <- label_csv[unlist(tweets_stm[i, 15]), 2]
+  tweets_stm[i, 17] <- max(stm_model_90$theta[i, ])
+}
+# Zuordnung der Topics zu Tweets nach jw. Maximal-Theta des Tweet-Dokuments laut STM-Modell
+
+topic_prop <- data.frame(topic = 1:90, sum = 0)
+for(i in 1:nrow(topic_prop)){
+  test <- tweets_stm %>% filter(max.topic == i)
+  topic_prop$sum[i] <- nrow(test)
+}
+# Selbes Muster, aber anders herum -> Tabelle über Mengenverteilung der einzelnen Topics
+
+for(i in 1:nrow(tweets_stm)){
+  tweets_stm$colour_scale[i] <- topic_prop$sum[topic_prop$topic == tweets_stm$max.topic[i]]
+} # Menge der Tweets je Topic, um grafische Darstellung zu ermöglichen
+ggplot(tweets_stm, aes(x = max.topic, y = max_prop, group = max.topic, fill = colour_scale)) + geom_boxplot() +
+  labs(title = "Maximale theta-Werte aller Tweets, gruppiert nach zugeordnetem Topic", 
+       x = "Topic", y = "theta-Wert") + scale_x_continuous(breaks = c(1, 10, 20, 30, 40, 50, 60, 70, 80, 90)) +
+  scale_y_continuous(breaks = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)) + theme_minimal() + 
+  scale_fill_continuous(trans = "sqrt",labels = scales::number, breaks = c(1000, 10000, 50000, 100000),
+                        name = "Anzahl\nan Tweets\nje Topic", low = "dark red", high = "white")
+# Auch wenn alle Topics Tweets mit thetha-Werten über das gesamte Spektrum beinhalten, finden sich doch einige Topics mit deutlich höheren Werten - 4 der Topics haben sogar einen Median von über 0.5.
+
+# write_csv(tweets_stm, file.path("Other Files/tweets_stm.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+# DATEIEN LADEN: tweets_stm <- read_csv("Other Files/tweets_stm.csv", col_types = cols(tweetid = col_character(), in_reply_to_tweetid = col_character(), quoted_tweet_tweetid = col_character()))
+
+
+# Interaktionen und Tweet-Mengen nach Topics
+tweets_stm <- tweets_stm %>% mutate(interactions = retweet_count + like_count + quote_count + reply_count) %>% 
+  mutate(inter.grp = ifelse(interactions > 0, "c1-100 Interaktionen", "dKeine Interaktionen")) %>% 
+  mutate(inter.grp = ifelse(interactions > 100, "b>100-1000 Interaktionen", inter.grp)) %>% 
+  mutate(inter.grp = ifelse(interactions > 1000, "a>1000 Interaktionen", inter.grp))
+for.plot <- tweets_stm %>% select(c(max.topic, topic_grp, inter.grp, interactions)) %>% mutate(max.topic = as.factor(max.topic)) %>%
+  mutate(topic_grp = ifelse(topic_grp %in% c("News", "Person", "Spam"), topic_grp, "Undefiniert (mehrere)"))
+
+for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) + theme_minimal() + 
+  scale_y_continuous(labels = scales::number, breaks = c(0, 25000, 50000, 75000, 100000, 125000)) + 
+  scale_x_discrete(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
+  scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
+  labs(title = "Anzahl an Interaktionen je Tweet und Topic", x = "Topic-Nummer", y = "Anzahl an Tweets je Topic",
+       subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
+
+for.plot %>% filter(interactions > 1000) %>% ggplot(aes(x = max.topic, y = interactions)) + geom_boxplot() +
+  scale_y_continuous(trans = "log", labels = scales::number, breaks = c(2000, 6000, 20000, 60000, 200000)) + 
+  theme_minimal() + facet_wrap(~ topic_grp, nrow = 4) +
+  scale_x_discrete(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
+  labs(title = "Anzahl an Tweet-Interaktionen je Topic", x = "Topic-Nummer", y = "Anzahl an Interaktionen je Tweet")
+
+
+topic_df <- data.frame(topic = paste0("topic_", label_csv$Number), group = label_csv$Group)
+for(i in 1:nrow(topic_df)){
+  df <- tweets_stm[tweets_stm$max.topic == i, ]
+  topic_df$tweet_num[i] <- nrow(df)
+  topic_df$unique_acc[i] <- length(unique(df$userid))
+  if(nrow(df > 0)){
+    topic_df$min_time[i] <- as.Date(min(df$tweet_time))
+    topic_df$max_time[i] <- as.Date(max(df$tweet_time))
+    topic_df$min_like[i] <- min(df$like_count)
+    topic_df$max_like[i] <- max(df$like_count)
+    topic_df$mean_like[i] <- mean(df$like_count)
+    topic_df$zero_like[i] <- sum(df$like_count == 0) / nrow(df)
+    topic_df$min_retweet[i] <- min(df$retweet_count)
+    topic_df$max_retweet[i] <- max(df$retweet_count)
+    topic_df$mean_retweet[i] <- mean(df$retweet_count)
+    topic_df$zero_retweet[i] <- sum(df$retweet_count == 0) / nrow(df)
+    topic_df$min_reply[i] <- min(df$reply_count)
+    topic_df$max_reply[i] <- max(df$reply_count)
+    topic_df$mean_reply[i] <- mean(df$reply_count)
+    topic_df$zero_reply[i] <- sum(df$reply_count == 0) / nrow(df)
+    topic_df$min_quote[i] <- min(df$quote_count)
+    topic_df$max_quote[i] <- max(df$quote_count)
+    topic_df$mean_quote[i] <- mean(df$quote_count)
+    topic_df$zero_quote[i] <- sum(df$quote_count == 0) / nrow(df)
+  } else {
+    topic_df$min_time[i] <- NA
+    topic_df$max_time[i] <- NA
+    topic_df$min_like[i] <- NA
+    topic_df$max_like[i] <- NA
+    topic_df$mean_like[i] <- NA
+    topic_df$zero_like[i] <- NA
+    topic_df$min_retweet[i] <- NA
+    topic_df$max_retweet[i] <- NA
+    topic_df$mean_retweet[i] <- NA
+    topic_df$zero_retweet[i] <- NA
+    topic_df$min_reply[i] <- NA
+    topic_df$max_reply[i] <- NA
+    topic_df$mean_reply[i] <- NA
+    topic_df$zero_reply[i] <- NA
+    topic_df$min_quote[i] <- NA
+    topic_df$max_quote[i] <- NA
+    topic_df$mean_quote[i] <- NA
+    topic_df$zero_quote[i] <- NA
+  }
+}
+topic_df$min_time <- as.Date(topic_df$min_time, origin="1970-01-01")
+topic_df$max_time <- as.Date(topic_df$max_time, origin="1970-01-01")
+
+
+
+tweets_stm %>% ggplot(aes(x = interactions)) + geom_histogram(bins = 70) + 
+  scale_x_continuous(trans = "sqrt") + scale_y_continuous(trans = "sqrt")

@@ -1,9 +1,27 @@
 
 ### Alle in dieser Datei aufgeführten Schritte sind als organisierter Zusatz zum Haupt-Script ("Code - Analysis.R") gedacht. Den hier präsentierten Code in seiner Gesamtheit auszuführen, führt zu keinerlei logischen und zielführenden Ergebnissen. Die folgenden Ladebefehle dienen rein der besseren Übersicht, falls eine bestimmte Datei im Hauptscript benötigt wird, die derzeit nicht geladen ist.
 
-# Alle benötigten Packages finden sich am Anfang des Analysis-Scriptes und werden unter Umständen für das Laden der Daten in diesem Script benötigt!
-
-
+{
+  library(dplyr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(reshape2)
+  library(RColorBrewer)
+  library(corrplot)
+  library(cowplot)
+  library(tidyr)
+  library(stringi)
+  library(stringr)
+  library(lubridate)
+  library(quanteda)
+  library(magrittr)
+  library(tm)
+  library(stm)
+  
+  set.seed(2020)
+  setwd("Y:/Don/Twitter Bachelor")
+}
 
 # Verwendete Twitter-Datensätze ----
 
@@ -30,4 +48,8 @@ used_documents <- used_documents %>% gsub("^text", "", .) %>% as.integer(.)
 load("selectK.RData")
 
 # STM - Interpretation ----
+label_csv <- read.csv("Other Files/STM_TopicLabels.csv", sep = ';', stringsAsFactors = F)
+
 load("Saved Files/stm_mod_90.RData")
+
+tweets_stm <- read_csv("Other Files/tweets_stm.csv", col_types = cols(tweetid = col_character(), in_reply_to_tweetid = col_character()))

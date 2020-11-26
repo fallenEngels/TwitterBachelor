@@ -12,7 +12,7 @@ rm(packages, pkg)
   library(ggplot2)
   
   set.seed(2020)
-  setwd("E:\\Twitter Bachelor")
+  setwd("Y:/Don/Twitter Bachelor")
 }
 
 # Verwendete Twitter-Datensätze ----
