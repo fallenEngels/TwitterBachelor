@@ -20,7 +20,7 @@
   library(stm)
   
   set.seed(2020)
-  setwd("Y:/Don/Twitter Bachelor")
+  setwd("Y:/Twitter Bachelor")
 }
 
 # Verwendete Twitter-Datensätze ----

@@ -27,11 +27,13 @@ rm(packages, pkg)
   library(stm)
   
   set.seed(2020)
-  setwd("Y:/Don/Twitter Bachelor")
+  setwd("Y:/Twitter Bachelor")
 }
 
 ### Der in dieser Datei präsentierte Code ist als konstant durchlaufendes Script gedacht - Vollständiges Markieren und Ausführen ist also möglich, wird aber aufgrund der voraussichtlichen Rechenzeit und der Dateigrößen nicht angeraten. Da einige der im Folgenden erzeugen Dateien aus aufwändigen und/oder rechenintensiven Schritten entstehen, besteht die Möglichkeit, diese komplexeren Elemente direkt zu laden. Aus diesem Grund werden sich an einzelnen Punkten in auskommentierter Form die Codes zum Speichern und Laden von Workspace-Dateien der jeweils erzeugten Daten finden.
 # Sollte man nach einer bestimmten Datei suchen, oder einen überblick über alle verfügbaren Workspace-Elemente haben wollen, so findet sich im zweiten R-Script ("Code - Data Loading.R") der Speicher- und Ladecode gebündelt und in übersichtlicher Form.
+
+# Sollte es zu Darstellungsfehlern bei Umlauten oder ähnlichen visuellen Problemen kommen, sind diese vermutlich durch ein Umstellen der Standard-Kodierung in den R-Globaloptionen auf UTF-8 und ein neues Öffnen des Scripts zu beheben.
 
 
 # Verwendete Twitter-Datensätze ----
@@ -680,67 +682,155 @@ for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) +
   scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
   labs(title = "Anzahl an Interaktionen je Tweet und Topic", x = "Topic-Nummer", y = "Anzahl an Tweets je Topic",
        subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
-# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen- SPam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten.
-# Zusäzlich lässt sich festhalten, dass die meisten Tweets keine einzige Interaktion aufweisen, und nur eine sehr kleine Minderheit mehr als 100 Interaktionen ansammeln konnte.
-for.plot %>% filter(interactions > 1000) %>% ggplot(aes(x = max.topic, y = interactions)) + geom_boxplot() +
-  scale_y_continuous(trans = "log", labels = scales::number, breaks = c(2000, 6000, 20000, 60000, 200000)) + 
-  theme_minimal() + facet_wrap(~ topic_grp, nrow = 4) +
-  scale_x_discrete(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
-  labs(title = "Anzahl an Tweet-Interaktionen je Topic", x = "Topic-Nummer", y = "Anzahl an Interaktionen je Tweet")
-# Das bedeutet jedoch nicht, dass die Topics sich strukturell in ihren Reichweite-Potenzialen unterscheiden. Ein sehr großer Anteil an Topics aus allen Bereichen weist Tweets mit mehr als 50.000 Interaktionen auf.
+# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen- SPam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Die mit Abstand meisten Tweets fallen dabei auf ein News-Topic.
+news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
+news_top68$tweet_text[sample(1:nrow(news_top68), 50)]
+head(news_top68$tweet_text, 50)
+# Dieses Topic umfasst dominant Berichte über krimineller Handlungen. Interessanterweise lassen sich zwei generelle Anätze in der Berichterstattung erkennen: Anti-Islam/Anti-Flüchtling/Pro-Trump-Tweets und Anti-Cop/Pro-BlackLivesMatter-Tweets.
 
-topic_df <- data.frame(topic = paste0("topic_", label_csv$Number), group = label_csv$Group)
-for(i in 1:nrow(topic_df)){
-  df <- tweets_stm[tweets_stm$max.topic == i, ]
-  topic_df$tweet_num[i] <- nrow(df)
-  topic_df$unique_acc[i] <- length(unique(df$userid))
-  if(nrow(df > 0)){
-    topic_df$min_time[i] <- as.Date(min(df$tweet_time))
-    topic_df$max_time[i] <- as.Date(max(df$tweet_time))
-    topic_df$min_like[i] <- min(df$like_count)
-    topic_df$max_like[i] <- max(df$like_count)
-    topic_df$mean_like[i] <- mean(df$like_count)
-    topic_df$zero_like[i] <- sum(df$like_count == 0) / nrow(df)
-    topic_df$min_retweet[i] <- min(df$retweet_count)
-    topic_df$max_retweet[i] <- max(df$retweet_count)
-    topic_df$mean_retweet[i] <- mean(df$retweet_count)
-    topic_df$zero_retweet[i] <- sum(df$retweet_count == 0) / nrow(df)
-    topic_df$min_reply[i] <- min(df$reply_count)
-    topic_df$max_reply[i] <- max(df$reply_count)
-    topic_df$mean_reply[i] <- mean(df$reply_count)
-    topic_df$zero_reply[i] <- sum(df$reply_count == 0) / nrow(df)
-    topic_df$min_quote[i] <- min(df$quote_count)
-    topic_df$max_quote[i] <- max(df$quote_count)
-    topic_df$mean_quote[i] <- mean(df$quote_count)
-    topic_df$zero_quote[i] <- sum(df$quote_count == 0) / nrow(df)
-  } else {
-    topic_df$min_time[i] <- NA
-    topic_df$max_time[i] <- NA
-    topic_df$min_like[i] <- NA
-    topic_df$max_like[i] <- NA
-    topic_df$mean_like[i] <- NA
-    topic_df$zero_like[i] <- NA
-    topic_df$min_retweet[i] <- NA
-    topic_df$max_retweet[i] <- NA
-    topic_df$mean_retweet[i] <- NA
-    topic_df$zero_retweet[i] <- NA
-    topic_df$min_reply[i] <- NA
-    topic_df$max_reply[i] <- NA
-    topic_df$mean_reply[i] <- NA
-    topic_df$zero_reply[i] <- NA
-    topic_df$min_quote[i] <- NA
-    topic_df$max_quote[i] <- NA
-    topic_df$mean_quote[i] <- NA
-    topic_df$zero_quote[i] <- NA
-  }
+# Zusäzlich lässt sich festhalten, dass die meisten Tweets keine einzige Interaktion aufweisen, und nur eine sehr kleine Minderheit mehr als 100 Interaktionen ansammeln konnte.
+for.plot %>% filter(interactions > 500) %>% ggplot(aes(x = max.topic, y = interactions, group = max.topic)) + geom_boxplot() +
+  scale_y_continuous(trans = "log", labels = scales::number, breaks = c(600, 2000, 6000, 20000, 60000, 200000)) + 
+  theme_minimal() + facet_wrap(~ topic_grp, nrow = 4) +
+  scale_x_continuous(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
+  labs(title = "Anzahl an Tweet-Interaktionen je Topic", x = "Topic-Nummer", y = "Interaktionen je Tweet")
+# Das bedeutet jedoch nicht, dass die Topics sich strukturell in ihren Reichweite-Potenzialen unterscheiden. Ein sehr großer Anteil an Topics aus allen Bereichen weist Tweets mit mehr als 50.000 Interaktionen auf. Dominant in Tweet-Anzahl und Interaktionsgröße sind hierbei zwei "Personal"- sowie zwei undefinierte Topics.
+tweets_stm %>% filter(max.topic == 15) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+tweets_stm %>% filter(max.topic == 23) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+# Während die reichweitenstärksten Tweets des ersten der zwei auffälligen "undefiniert"-Topics eindeutig die Errungenschaften und Geschichten weiblicher PoC feiert, zeigt sich das zweite Topic weniger eindeutig. So finden sich neben zwei Tweets zu afrikanischen Sportlern und Doktoren dominant Tweets zu rechten Themen und Personen wie Ted Cruz und Laura Loomer - Auch wenn das Gesamtbild hier weniger eindeutig ist, als im ersten Topic.
+tweets_stm %>% filter(max.topic == 57) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) # NOTE: Die hier vorkommenden \u... stammen von in der Emoji-Ersetzung nicht erfassten Hautfarben-Modifikatoren. Diese Modifikatoren betreffen dabei immer das vorangehende Emoji und lassen sich am letzten Buchstaben identifizieren - von B für die hellste Stufe bis F für die dunkelste.
+tweets_stm %>% filter(max.topic == 59) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) 
+# Während die Top-Posts des zweiten untersuchten Personen-Topics hauptsächlich in die Kategorie "Feelgood-Posts" zu gehören scheinen (auch wenn hier festzuhalten ist, dass ein großer Teil der Postings sich auf schwarze Kinder zu beziehen scheint), findet sich im ersten betrachteten Topic ein ähnliches Bild wie in Topic 15, nur mit einem stärkeren Bezug auf aktuelle, negative Ereignisse wie den Tod Trayvon Martins oder die Feuerung Colin Kapernicks
+
+# Interaktionen mit anderen Tweets
+replies_stm <- tweets_stm %>% filter(!(is.na(in_reply_to_tweetid)))
+
+for.plot <- replies_stm %>% select(c(max.topic, topic_grp, inter.grp, interactions)) %>% mutate(max.topic = as.integer(max.topic)) %>%
+  mutate(topic_grp = ifelse(topic_grp %in% c("News", "Person", "Spam"), topic_grp, "Undefiniert (mehrere)"))
+for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) + theme_minimal() + 
+  scale_y_continuous(labels = scales::number, breaks = c(0, 1000, 2000, 3000, 4000)) + 
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) +
+  scale_fill_discrete(name = "Summe erhalte-\nner Interaktionen\nje Antwort", labels = c(">1000", ">100-1000", "1-100", "0")) +
+  labs(title = "Anzahl an Antworten auf andere Tweets", x = "Topic-Nummer", y = "Anzahl an Antwort-Tweets",
+       subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
+# Klare Dominanz von Antworten bei Spam-Tweets und persönlichen Tweets, mit deutlichen Unterschieden je nach Topic.
+
+
+
+# Top-Antwort-Topics aus "Person"-Kategorie
+
+
+
+
+# Interne Antworten
+replies_stm_int <- replies_stm %>% filter(in_reply_to_tweetid %in% tweets_stm$tweetid) %>%
+  select(tweetid, userid, tweet_text, tweet_time, in_reply_to_tweetid, max.topic, topic_grp, interactions) %>% mutate(src_topic = 99, src_grp = NA)
+
+for(i in 1:nrow(replies_stm_int)){
+  r <- which(tweets_stm$tweetid == replies_stm_int$in_reply_to_tweetid[i])
+  replies_stm_int$src_topic[i] <- tweets_stm$max.topic[r]
+  replies_stm_int$src_grp[i] <- tweets_stm$topic_grp[r]
 }
-topic_df$min_time <- as.Date(topic_df$min_time, origin="1970-01-01")
-topic_df$max_time <- as.Date(topic_df$max_time, origin="1970-01-01")
+
+replies_stm_int %>% 
+  mutate(topic_grp = ifelse(topic_grp %in% c("News", "Person", "Spam"), topic_grp, "Undefiniert (mehrere)")) %>% 
+  mutate(src_grp = ifelse(src_grp %in% c("News", "Person", "Spam"), src_grp, "Undefiniert (mehrere)")) %>% 
+  ggplot(aes(x = max.topic, y = src_grp)) + geom_count() + facet_wrap(~ topic_grp, nrow = 4) +
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) + theme_minimal() +
+  labs(title = "Verteilung interner Antworten", x = "Topic-Nummer", y = "Ziel-Topicgruppe",
+       subtitle = "Antworten an Tweets, die sich ebenfalls in den Daten finden, aufgeteilt nach Quellen- und Ziel-Topic") + facet_wrap(~ topic_grp, nrow = 4)
+# Interne Antworten gehen dominant an News-Topics - aber an welche?
+replies_stm_int %>% mutate(src_grp = ifelse(src_grp %in% c("News", "Person", "Spam"), src_grp, "Undefiniert (mehrere)")) %>% 
+  ggplot(aes(x = src_topic)) + geom_bar(size = 1) + theme_minimal() + 
+  scale_y_continuous(labels = scales::number) + 
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) +
+  scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
+  labs(title = "Zieltopics interner Antworten", x = "Topic-Nummer", y = "Antworten auf jw. Topic") + facet_wrap(~ src_grp, nrow = 4)
+# Das Topic mit den meisten Tweets dominiert mit den meisten Antworten. Die Topics #70 (Spam) und #81 (News) erhielten aber deutlich mehr Antworten, als sie anteilsmäßig an Tweets aufweisen.
+tweets_stm %>% filter(max.topic == 70) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+tweets_stm %>% filter(max.topic == 81) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) 
+# Dominant anti-Flüchtlings- und anti-Islam-Rhetorik.
+
+
+
+
+### Analyse von News-Topics mit gesellschaftlicher Relevanz: Überprüfung aller News-Topics auf mehrfach auftretende Themenkomplexe zu politischen/gesellschaftlihen Themen, die sich in ein Rechts-Links-Spektrum einordnen lassen und Interaktionen erhielten.
+# Aufbau Rechts-Links-Spektrum durch Extraktion von Kern-Themen und -Phrasen aus den jeweiligen Topics und Zuordnung zu jeweiliger Seite.
+news_top <- tweets_stm %>% filter(max.topic == 4) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions))
+head(news_top$tweet_text, 50)
+news_top$tweet_text[sample(1:nrow(news_top), 50)]
+# Tweets zu einer Reihe an rechten und linken Märschen und Demonstrationen.
+rw_news <- tweets_stm[tweets_stm$tweetid %in% news_top$tweetid[
+  which(grepl("sharia|marchforlife|renamemillion|libs", 
+              news_top$tweet_text, ignore.case = T))], c(1:4, 15, 19)]
+lw_news <- tweets_stm[tweets_stm$tweetid %in% news_top$tweetid[
+  which(grepl("blackhistory|black", 
+              news_top$tweet_text, ignore.case = T))], c(1:4, 15, 19)]
+lw_news <- lw_news[!(grepl("makeamovieblack", lw_news$tweet_text, ignore.case = T)), ] #Entfernen eines aufgegriffenen Hashtags
+
+
+news_top <- tweets_stm %>% filter(max.topic == 5) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions))
+head(news_top$tweet_text, 50)
+news_top$tweet_text[sample(1:nrow(news_top), 50)]
+# Angriffe auf demokratische Abgeordnete, rechte Verschwörungstheorien um Wikileaks-Releases und Seth Rich -> Anti-Hillary.
+table(grepl("seth rich|sethrich|pizzagate", news_top$tweet_text, ignore.case = T))
+# Obwohl nur wenige Tweets Seth Rich erwähnen, und sich nur je ein Tweet zu Pizzagate und gegen Uranium One finden, tauchen alle diese Themen in den Top-Tweets des Topics auf.
+rw_news <- bind_rows(rw_news, tweets_stm[tweets_stm$tweetid %in% news_top$tweetid[
+  which(grepl("seth rich|sethrich|pizzagate", 
+              news_top$tweet_text, ignore.case = T))], c(1:4, 15, 19)])
+
+
+news_top <- tweets_stm %>% filter(max.topic == 8) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions))
+head(news_top$tweet_text, 50)
+news_top$tweet_text[sample(1:nrow(news_top), 50)]
+# Pro-Trump Tweets zu diversen Topics, Zelebrierung der Errungenschaften schwarzer Amerikaner und Hinweise auf verstorbene schwarze Amerikaner -> Polizeigewalt?
+table(grepl("migrant|build the wall|build that wall|guccifer|seth rich", news_top$tweet_text, ignore.case = T))
+# Obwohl nur wenige Tweets Seth Rich erwähnen, und sich nur je ein Tweet zu Pizzagate und gegen Uranium One finden, tauchen alle diese Themen in den Top-Tweets des Topics auf.
+rw_news <- bind_rows(rw_news, tweets_stm[tweets_stm$tweetid %in% news_top$tweetid[
+  which(grepl("migrant|build the wall|build that wall", 
+              news_top$tweet_text, ignore.case = T))], c(1:4, 15, 19)])
+
+
+
+
+
+
+
+
+
 
 news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
 news_top68$tweet_text[sample(1:nrow(news_top68), 50)]
 head(news_top68$tweet_text, 50)
-# Während sich das Topic aus allen möglichen Nachrichtenmeldungen zu Kriminalität und Unfällen besteht, finden sich in den Top-Tweets zwei  gegensätzliche Strömungen: Zum Einen Pro-Polizei-Berichte zu muslimischen Tätern und terroristischen Anschlägen, insbesondere in Europa und zum Anderen Anti-Polizei-Berichte zu übermäßigem Gewalteinsatz von US-Polizisten insbesondere gegen schwarze Bürger. Es zeigt sich also bereits hier der Ansatz einer Aufspaltung in rechte/linke Echokammern
+# Während sich das Topic aus allen möglichen Nachrichtenmeldungen zu Kriminalität und Unfällen besteht, finden sich in den Top-Tweets zwei  gegensätzliche Strömungen: Zum Einen Pro-Polizei-Berichte zu muslimischen Tätern und terroristischen Anschlägen, insbesondere in Europa und zum Anderen Anti-Polizei-Berichte zu übermäßigem Gewalteinsatz von US-Polizisten insbesondere gegen schwarze Bürger. Es zeigt sich also bereits hier der Ansatz einer Aufspaltung in rechte/linke Echokammern.
+news_top66 <- tweets_stm %>% filter(max.topic == 66) %>% filter(interactions > 0) %>% arrange(desc(interactions))
+news_top66$tweet_text[sample(1:nrow(news_top66), 50)]
+head(news_top66$tweet_text, 50)
+
+
+news_top8 <- tweets_stm %>% filter(max.topic == 8) %>% filter(interactions > 0) %>% arrange(desc(interactions))
+news_top8$tweet_text[sample(1:nrow(news_top8), 50)]
+head(news_top8$tweet_text, 50)
+# WIe bereits zuvor, Großteil an Tweets scheinn unzusammenhängende Nachrichten zu Ereignisssen und bekannten Personen zu sein, aber die Top-Ergebnisse zeigen zu großen Teilen eine zelebrierung der Errungenschaften und Opfer schwarzer.
+
+
+
+
+
+
+
+table(grepl("sharia", news_top66$tweet_text, ignore.case = T))
+
+
 news_top68_subL <- news_top68[grepl("black", news_top68$tweet_text, ignore.case = T),]
 news_top68_subR <- news_top68[grepl("muslim|refugee|paris|manchester|europe", news_top68$tweet_text, ignore.case = T),]
 table(unique(news_top68_subL$userid) %in% news_top68_subR$userid)
