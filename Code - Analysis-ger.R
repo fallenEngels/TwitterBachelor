@@ -682,7 +682,7 @@ for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) +
   scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
   labs(title = "Anzahl an Interaktionen je Tweet und Topic", x = "Topic-Nummer", y = "Anzahl an Tweets je Topic",
        subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
-# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen- SPam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Die mit Abstand meisten Tweets fallen dabei auf ein News-Topic.
+# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen-, Spam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Die mit Abstand meisten Tweets fallen dabei auf ein News-Topic.
 news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
 news_top68$tweet_text[sample(1:nrow(news_top68), 50)]
 head(news_top68$tweet_text, 50)
@@ -695,16 +695,28 @@ for.plot %>% filter(interactions > 500) %>% ggplot(aes(x = max.topic, y = intera
   scale_x_continuous(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
   labs(title = "Anzahl an Tweet-Interaktionen je Topic", x = "Topic-Nummer", y = "Interaktionen je Tweet")
 # Das bedeutet jedoch nicht, dass die Topics sich strukturell in ihren Reichweite-Potenzialen unterscheiden. Ein sehr großer Anteil an Topics aus allen Bereichen weist Tweets mit mehr als 50.000 Interaktionen auf. Dominant in Tweet-Anzahl und Interaktionsgröße sind hierbei zwei "Personal"- sowie zwei undefinierte Topics.
+
+# "Undefiniert"-Topics mit >100k-Interaktionen-Tweets:
 tweets_stm %>% filter(max.topic == 15) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 tweets_stm %>% filter(max.topic == 23) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
-# Während die reichweitenstärksten Tweets des ersten der zwei auffälligen "undefiniert"-Topics eindeutig die Errungenschaften und Geschichten weiblicher PoC feiert, zeigt sich das zweite Topic weniger eindeutig. So finden sich neben zwei Tweets zu afrikanischen Sportlern und Doktoren dominant Tweets zu rechten Themen und Personen wie Ted Cruz und Laura Loomer - Auch wenn das Gesamtbild hier weniger eindeutig ist, als im ersten Topic.
-tweets_stm %>% filter(max.topic == 57) %>% filter(interactions > 0) %>% 
+tweets_stm %>% filter(max.topic == 69) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+tweets_stm %>% filter(max.topic == 72) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+# Während die reichweitenstärksten Tweets des ersten der vier Topics eindeutig die Errungenschaften und Geschichten weiblicher PoC feiert, zeigt sich das zweite Topic weniger eindeutig. So finden sich neben zwei Tweets zu afrikanischen Sportlern und Doktoren dominant Tweets zu rechten Themen und Personen wie Ted Cruz und Laura Loomer - Auch wenn das Gesamtbild hier weniger eindeutig ist, als im ersten Topic. Das dritte Topic ist ebenfalls gemischt - obwohl ein dominanter Teil der Tweets sich mit Themen des Trump-Universums auseinandersetzt, finden sich drei wortgleiche Tweets, die Trump kritisieren udn angreifen. Topic vier beschäftigt sich erneut hauptsächlich mit schwarzen Amerikanern - wobei hier keine klare Rechts-Links-Zuordnung möglich ist, da sich Tweets für beide Seiten finden.
+
+# "Person"-Topics mit >100k-Interaktionen-Tweets:
+tweets_stm %>% filter(max.topic == 2) %>% filter(interactions > 0) %>%
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+tweets_stm %>% filter(max.topic == 42) %>% filter(interactions > 0) %>%
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+tweets_stm %>% filter(max.topic == 57) %>% filter(interactions > 0) %>%
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) # NOTE: Die hier vorkommenden \u... stammen von in der Emoji-Ersetzung nicht erfassten Hautfarben-Modifikatoren. Diese Modifikatoren betreffen dabei immer das vorangehende Emoji und lassen sich am letzten Buchstaben identifizieren - von B für die hellste Stufe bis F für die dunkelste.
 tweets_stm %>% filter(max.topic == 59) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) 
-# Während die Top-Posts des zweiten untersuchten Personen-Topics hauptsächlich in die Kategorie "Feelgood-Posts" zu gehören scheinen (auch wenn hier festzuhalten ist, dass ein großer Teil der Postings sich auf schwarze Kinder zu beziehen scheint), findet sich im ersten betrachteten Topic ein ähnliches Bild wie in Topic 15, nur mit einem stärkeren Bezug auf aktuelle, negative Ereignisse wie den Tod Trayvon Martins oder die Feuerung Colin Kapernicks
+# Während die Top-Posts des vierten untersuchten Personen-Topics hauptsächlich in die Kategorie "Feelgood-Posts" zu gehören scheinen (auch wenn hier festzuhalten ist, dass ein großer Teil der Postings sich auf schwarze Kinder zu beziehen scheint), weisen die anderen drei Topics erneut politische Themen auf. Das erste untersuchte Topic beschäftigt sich dabei                                                                                   . findet sich im ersten betrachteten Topic ein ähnliches Bild wie in Topic 15, nur mit einem stärkeren Bezug auf aktuelle, negative Ereignisse wie den Tod Trayvon Martins oder die Feuerung Colin Kapernicks
 
 # Interaktionen mit anderen Tweets
 replies_stm <- tweets_stm %>% filter(!(is.na(in_reply_to_tweetid)))
@@ -722,7 +734,10 @@ for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) +
 
 
 # Top-Antwort-Topics aus "Person"-Kategorie
-
+replies_stm %>% filter(max.topic == 1) %>% filter(interactions > 0) %>%
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+replies_stm %>% filter(max.topic == 2) %>% filter(interactions > 0) %>%
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 
 
 
