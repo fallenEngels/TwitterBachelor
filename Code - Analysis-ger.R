@@ -60,6 +60,24 @@ languages
 head(users$user_profile_description[users$account_language == "de"], 20)
 # Vermutlich ISO 639-1 bzw. lokalisierte (en-gb, zh-cn) Tags. Der Großteil der Accounts sind englischsprachig eingestellt, aber ein knappes Drittel gibt russisch als Sprache an. West- u. Zentraleuropäische Accounts sind die drittgrößte Gruppe (Deutschland, UK, Frankreich, Spanien, Italien) vor arabischen Accounts. Vereinzelte Chinesen, Indonesier und Ukrainer.
 
+# Exklusivität Englisch und Russisch
+lang_excl <- data.frame(userid = users$userid, tweets = 0, eng = 0, rus = 0, oth = 0, eng_perc = 0, rus_perc = 0, oth_perc = 0)
+for(i in 1:nrow(lang_excl)){
+  usr_twt <- tweets %>% filter(userid == lang_excl$userid[i]) %>% select(userid, tweet_language) %>% filter(!(is.na(tweet_language)))
+  lang_excl$tweets[i] <- nrow(usr_twt)
+  lang_excl$eng[i] <- nrow(usr_twt[usr_twt$tweet_language == "en", ])
+  lang_excl$rus[i] <- nrow(usr_twt[usr_twt$tweet_language == "ru", ])
+  lang_excl$oth[i] <- lang_excl$tweets[i] - (lang_excl$eng[i] + lang_excl$rus[i])
+  lang_excl$eng_perc[i] <- lang_excl$eng[i] / lang_excl$tweets[i] * 100
+  lang_excl$rus_perc[i] <- lang_excl$rus[i] / lang_excl$tweets[i] * 100
+  lang_excl$oth_perc[i] <- lang_excl$oth[i] / lang_excl$tweets[i] * 100
+}
+lang_excl.long <- lang_excl %>% select(userid, eng_perc, rus_perc, oth_perc) %>% filter(tweets > 0)
+lang_excl.long <- reshape2::melt(lang_excl.long, id.vars = "userid")
+
+lang_excl.long %>% ggplot(aes(x = variable, y = value, color = variable)) + geom_violin()
+
+
 #Aufbereitung als Data Frame, Gruppierung und Vorbereitung für Vergleich mit angegebenen Orten
 lang1 <- as.character(languages[, 1])
 lang2 <- languages[, 2]
