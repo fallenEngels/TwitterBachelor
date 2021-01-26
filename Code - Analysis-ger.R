@@ -30,40 +30,69 @@ rm(packages, pkg)
   setwd("Y:/Twitter Bachelor")
 }
 
+{
+  library(dplyr)
+  library(readr)
+  library(tidyr)
+  library(stringr)
+  library(reshape2)
+  library(ggplot2)
+  library(lubridate)
+  library(quanteda)
+  library(stm)
+  
+  setwd("Y:/Twitter Bachelor")
+}
+
 ### Der in dieser Datei präsentierte Code ist als konstant durchlaufendes Script gedacht - Vollständiges Markieren und Ausführen ist also möglich, wird aber aufgrund der voraussichtlichen Rechenzeit und der Dateigrößen nicht angeraten. Da einige der im Folgenden erzeugen Dateien aus aufwändigen und/oder rechenintensiven Schritten entstehen, besteht die Möglichkeit, diese komplexeren Elemente direkt zu laden. Aus diesem Grund werden sich an einzelnen Punkten in auskommentierter Form die Codes zum Speichern und Laden von Workspace-Dateien der jeweils erzeugten Daten finden.
 # Sollte man nach einer bestimmten Datei suchen, oder einen überblick über alle verfügbaren Workspace-Elemente haben wollen, so findet sich im zweiten R-Script ("Code - Data Loading.R") der Speicher- und Ladecode gebündelt und in übersichtlicher Form.
 
 # Sollte es zu Darstellungsfehlern bei Umlauten oder ähnlichen visuellen Problemen kommen, sind diese vermutlich durch ein Umstellen der Standard-Kodierung in den R-Globaloptionen auf UTF-8 und ein neues Öffnen des Scripts zu beheben.
 
 
+
 # Verwendete Twitter-Datensätze ----
-users <- as.data.frame(read_csv("Twitter Data/ira_users_csv_hashed.csv")) # Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
 
-tweets <- as.data.frame(read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))) # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
-
-#tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, ursprüngliche Version vom 15.10.2018 - original für ANalysen mit aufgenommen, in Endversion des Scriptes jedoch nicht benötigt.
+users <- as.data.frame(read_csv("Twitter Data/ira_users_csv_hashed.csv")) 
+# Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
+tweets <- as.data.frame(read_csv("Twitter Data/ira_tweets_csv_hashed.csv", 
+                                 col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(),
+                                                  in_reply_to_tweetid = col_character(), latitude = col_factor(), 
+                                                  longitude = col_factor(), poll_choices = col_character()))) 
+# Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
 
 # Nutzung von read_csv (readr) statt read.csv (base), da base-Funktion ohne großen Aufwand nicht zur Darstellung der unterschiedlichen Schriftsätze (westlich, kyrillisch, arabisch, ...) innerhalb einer Datei fähig zu sein scheint.
 
 # !ACHTUNG!
-# Es ist aufgrund der schieren Größe des Tweet-Datensatzes (>5GB) je nach vorhandenem Arbeitsspeichers dazu zu raten, diesen nur dann zu laden, wenn er aktiv benötigt wird und nach Gebrauch zu entladen ( rm(NAME) ). Sollte dies den Speicher nicht komplett leeren, kann mit einer Garbage Collection oder R-Neustart nachgeholfen werden ( gc() bzw. .rs.restartR() respektive).
+# Es ist aufgrund der schieren Größe des Tweet-Datensatzes (>5GB) je nach vorhandenem Arbeitsspeicher dazu zu raten, diesen nur dann zu laden, wenn er aktiv benötigt wird und nach Gebrauch zu entladen ( rm(NAME) ). Sollte dies den Speicher nicht komplett leeren, kann mit einer Garbage Collection oder R-Neustart nachgeholfen werden ( gc() bzw. .rs.restartR() respektive).
 
 # !ACHTUNG 2!
 # Es kann scheinbar bei der Nutzung von dplyr vorkommen, dass scheinbar zufällige Befehle die Warnmeldungen "Unknown or uninitialized column" produzieren. Diese Warnmeldung sollte jedoch im Normalfall zu ignorieren sein und hat nichts mit dem ausgeführten Befehl zu tun: https://github.com/tidyverse/tibble/issues/450 
 
-# Analyse Users: ----
+
+
+
+# Deskriptive Analysen: ----
 
 ### Account-Sprachen
-languages <- data.frame(sort(table(users$account_language), decreasing = T))
-languages$perc <- languages$Freq / nrow(users) *100
-languages
-head(users$user_profile_description[users$account_language == "de"], 20)
+acc_lang <- data.frame(sort(table(users$account_language), decreasing = T))
+acc_lang$perc <- acc_lang$Freq / nrow(users) *100
+acc_lang
 # Vermutlich ISO 639-1 bzw. lokalisierte (en-gb, zh-cn) Tags. Der Großteil der Accounts sind englischsprachig eingestellt, aber ein knappes Drittel gibt russisch als Sprache an. West- u. Zentraleuropäische Accounts sind die drittgrößte Gruppe (Deutschland, UK, Frankreich, Spanien, Italien) vor arabischen Accounts. Vereinzelte Chinesen, Indonesier und Ukrainer.
+twt_lang <- data.frame(sort(table(tweets$tweet_language), decreasing = T))
+twt_lang$perc <- twt_lang$Freq / nrow(tweets) * 100
+twt_lang$perc <- format(twt_lang$perc, scientific = F, digits = 1)
+twt_lang
+# Obwohl die meisten Accounts englischsprachig eingestellt sind, sind dominant mehr Tweets in russischer Sprache verfasst, mit englischen Tweets auf Platz 2 - Tweeten englisch eingestellte Accounts auf russisch oder tweeten russisch eingestellte Accounts mehr als englische?
+table(tweets$account_language == tweets$tweet_language) / nrow(tweets) * 100
+# In 72,6% der Fälle stimmt die Tweet-Sprache mit der gewählten Account-Sprache überein. Russischsprachige Accounts scheinen also einfach mehr getweetet zu haben als englischsprachige
 
-# Exklusivität Englisch und Russisch
+
+# Exklusivität Englisch und Russisch - Grafische Veranschaulichung
 lang_excl <- data.frame(userid = users$userid, tweets = 0, eng = 0, rus = 0, oth = 0, eng_perc = 0, rus_perc = 0, oth_perc = 0)
 for(i in 1:nrow(lang_excl)){
-  usr_twt <- tweets %>% filter(userid == lang_excl$userid[i]) %>% select(userid, tweet_language) %>% filter(!(is.na(tweet_language)))
+  usr_twt <- tweets %>% filter(userid == lang_excl$userid[i]) %>% select(userid, tweet_language) %>% 
+    filter(!(is.na(tweet_language)))
   lang_excl$tweets[i] <- nrow(usr_twt)
   lang_excl$eng[i] <- nrow(usr_twt[usr_twt$tweet_language == "en", ])
   lang_excl$rus[i] <- nrow(usr_twt[usr_twt$tweet_language == "ru", ])
@@ -71,148 +100,144 @@ for(i in 1:nrow(lang_excl)){
   lang_excl$eng_perc[i] <- lang_excl$eng[i] / lang_excl$tweets[i] * 100
   lang_excl$rus_perc[i] <- lang_excl$rus[i] / lang_excl$tweets[i] * 100
   lang_excl$oth_perc[i] <- lang_excl$oth[i] / lang_excl$tweets[i] * 100
-}
-lang_excl.long <- lang_excl %>% select(userid, eng_perc, rus_perc, oth_perc) %>% filter(tweets > 0)
-lang_excl.long <- reshape2::melt(lang_excl.long, id.vars = "userid")
+} # This might take a while
+rm(usr_twt, i)
+lang_excl.long <- lang_excl %>% select(userid, eng_perc, rus_perc, oth_perc) %>% filter(!(is.nan(eng_perc)))
+lang_excl.long <- melt(lang_excl.long, id.vars = "userid")
 
-lang_excl.long %>% ggplot(aes(x = variable, y = value, color = variable)) + geom_violin()
+lang_excl.long %>% ggplot(aes(x = variable, y = value, fill = variable)) + geom_violin() + theme_minimal() +
+  labs(x = "Sprache", y = "Anteil an Tweets je Account in %") + 
+  scale_fill_discrete(name = "Sprache", labels = c("Englisch", "Russisch", "Andere"))
+# Sprachauswahl scheint dominant Accounts zu bestimmen, kaum Accounts unter ~80% einer Sprache -> gute Filtermöglichkeit, Dominanz anderer Sprachen on ~5-10% je Account lässt strukturelles Mislabeling bestimmter (zu kurzer?) Tweets vermuten
+rm(lang_excl, lang_excl.long)
+# "Falsche" Sprachen genauer analysiert
+table(tweets$account_language != tweets$tweet_language)[2] # 2,1 Mio "falsch" gelabelte Tweets
+data.frame(sort(table(tweets$account_language[tweets$account_language != tweets$tweet_language]), decreasing = T))[1:5,]
+data.frame(sort(table(tweets$tweet_language[tweets$account_language != tweets$tweet_language]), decreasing = T))[1:5,]
+# Es scheint sich bei den Unterschieden zwischen Account- und Tweet-Sprache dominant um russischsprachige Accounts mit englischer Spracheinstellung zu handeln, da 1,7 Mio der 2,1 Mio "Fehler" englische Account-Sprache, und 1,4 Mio russische Tweet-Sprache angeben
+rm(twt_lang, acc_lang)
 
 
-#Aufbereitung als Data Frame, Gruppierung und Vorbereitung für Vergleich mit angegebenen Orten
-lang1 <- as.character(languages[, 1])
-lang2 <- languages[, 2]
-other <- which(lang1 %in% c("zh-cn", "id"))
-europe <- which(lang1 %in% c("de","en-gb", "fr", "es", "it"))
-lang1 <- append(lang1, c("european", "other", "fantasy", "NA")) # fantasy + NA -> Platzhalter für später
-lang2 <- append(lang2, c(sum(lang2[europe]), sum(lang2[other]), 0, sum(is.na(users$account_language))))
-lang1 <- lang1[-c(other, europe)]
-lang2 <- lang2[-c(other, europe)]
-loclang <- data.frame(lang1, lang2)
-names(loclang) <- c("language", "language_n")
-loclang$language_perc <- loclang$language_n / nrow(users) * 100
-rm(lang1, lang2, other, europe)
 
-loclang
-sum(loclang$language_n)
+### Sprachfilter: Da es hier um die Beeinflussung der USA gehen soll, sind nur englischsprachige Tweets von Interesse - Der Anteil von Amerikanern, die russisch, ukrainisch oder eine der anderen Sprachen beherrscht und auf zufällig aufauchende Tweets in diesen Sprachen reagiert sollte nicht ausreichen, um einen bedeutenden Einfluss zu entwickeln. Wie eben gesehen, scheint die von Twitter gewählte Sprache hierbei ein guter Indikator zu sein.
+tweets_eng <- tweets %>% filter(tweet_language == "en")
+users_eng <- users %>% filter(userid %in% tweets_eng$userid)
+# Deutlicher Nachlass in Tweets, 8,5 Mio -> 3 Mio (1/3), kaum Nachlass in Accounts mit mind. 1 englischsprachigen Tweet, 3608 -> 3077
+rm(tweets, users)
+
 
 
 ### Orte
-table(users$user_reported_location)
-users <- users %>% mutate(shortened_location = NA)
+table(users_eng$user_reported_location)
 #Keine eindeutige Sortierung - wie zu vermuten bei individuellen Angaben - also manuelle Nachsortierung notwendig! (Im Folgenden hinter {Klammern} versteckbar für bessere Übersicht und einfache Code-Ausführung)
+users_eng <- users_eng %>% mutate(shortened_location = NA)
 {
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("U.S.A", "USA", "Usa", "usa", "US", "us", "united states", "United States", "America", "AMERICA", "Amerika", "THE US", "mother America", "Murica", "Estados Unidos", "Douglas, United States"), "US", NA)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("U.S.A", "USA", "Usa", "usa", "US", "us", "united states", "United States", "America", "AMERICA", "Amerika", "THE US", "mother America", "Murica", "Estados Unidos", "Douglas, United States"), "US", NA)
   # US-Bundesstaaten und D.C.
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Troy, Alabama", "alabama", "AL"), "US, Alabama", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Alaska"), "US, Alaska", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Arizona, USA", "Arizona", "arizona", "ARIZONA", "City of Phoenix, Arizona", "Phoenix", "Mesa", "AZ"), "US, Arizona", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("arkansas"), "US, Arkansas", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Venice, California", "Redwood City, California", "San-Francisco", "Oakland, CA", "California", "California, USA", "CA", "UC Davis", "Santa Barbara, California", "San Francisco", "San Francisco, CA","SF", "San Diego", "San DIego, CA", "San Diego, United States", "Rancho Rinconada, CA, USA", "San Diego, CA", "Riverside", "Santa Monica", "Los Gatos, California", "Los Angeles, CA", "Los ANgeles", "los angeles", "Los-Angeles", "Los Angeles", "Hollywood", "Fowler, California"), "US, California", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("La Junta, Colorado", "Denver, CO", "Colorado"), "US, Colorado", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("New Haven"), "US, Conneticut", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Delaware, USA"), "US, Delaware", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Weeki Wachee, Florida", "USA, FL", "North Port, FL", "Destin, Florida", "Orlando", "Orlando, FL", "Tallahassee", "Miami", "Miami, FL", "Miami, USA", "jacksonville", "Jacksonville", "Florida, USA", "Florida"), "US, Florida", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("USA, Atlanta", "ATL", "ATL, GA", "Atlanta", "Atlanta, GA", "Atlanta, Georgia", "Macon, GA", "Georgia", "Georgia, USA", "Druid Hills, GA", "Downtown, Atlanta", "Brookhaven, GA"), "US, Georgia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c(), "US, Hawaii", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("ID"), "US, Idaho", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Aurora, Illinois", "Chicago", "Chicago, IL"), "US, Illinois", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("INDIANAPOLIS, USA"), "US, Indiana", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c(), "US, Iowa", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Wichita, KS", "Kansas", "Kansas, USA"), "US, Kansas", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Louisville"), "US, Kentucky", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Baton Rouge, LA", "New Orleans, LA", "New Orleans", "New Orlean", "Louisiana", "LA", "Lafayette, LA"), "US, Louisiana", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Brunswick, ME, USA"), "US, Maine", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Baltimore", "Baltimore, MD", "temple hills, md"), "US, Maryland", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Salem, Massachusetts", "Boston", "Boston, MA", "Boston, USA"), "US, Massachusetts", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Bloomfield Hills, Michigan", "Michigan", "Flint, MI", "Detroit", "Detroit, Michigan"), "US, Michigan", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("MN", "Mn", "Minnesota", "Minneapolis, MN", "Menisotta"), "US, Minnesota", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Jackson, MS", "Jackson"), "US, Mississippi", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("StLouis", "St Louis, MO", "Missouri, USA", "Kansas City, MO", "Ferguson, MO"), "US, Missouri", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Montana"), "US, Montana", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Nebraska, USA"), "US, Nebraska", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Vegas", "Nevada", "Las Vegas"), "US, Nevada", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("NH", "New Hampshire"), "US, New Hampshire", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("NJ", "Newark, NJ", "Camden, NJ", "New Jersey", "New Jersey, USA", "Old Bridge, New Jersey"), "US, New Jersey", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("NM", "Albuquerque", "Albuquerque, NM", "Eldorado at Santa Fe, NM, USA", "Los Alamos"), "US, New Mexico", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("NYC", "nyc", "NY City", "NY", "ny", "New York, USA", "New York, NY", "New York City", "New - York", "New-York", "Bronx, NY", "brooklyn", "Brooklyn", "Brooklyn, NY", "Brkln", "The Big Apple", "Queens, NY", "New York", "Manhattan, NY", "Garden City, NY", "Johnson City, New York", "East Aurora, New York", "Baldwinsville, New York", "Buffalo"), "US, New York", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("North Carolina", "Raleigh, North Carolina", "Greensboro"), "US, North Carolina", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("North Dakota"), "US, North Dakota", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Whitehall, Ohio", "Cincinnati, OH", "Cleveland, OH", "cleveland / ohio", "Cleve", "Columbus, Ohio", "Ohio", "Ohio, USA", "OH", "Montgomery", "Montgomery, Ohio", "Millville village, OH, USA", "Milford, Ohio", "Grove City, Ohio", "Green village, OH, USA", "City of Cleveland, USA", "Cincinnati"), "US, Ohio", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Oklahoma", "Oklahoma City", "Oklahoma, PA", "Oklahoma, USA"), "US, Oklahoma", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("portland", "Portland"), "US, Oregon", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Pittsburgh", "Pittsburgh, PA", "Pittsburgh, US", "Philadelhia", "Philadelphia", "Philadelphia, PA", "Philly", "Pennsylvania", "Mohnton, PA", "Chester, PA"), "US, Pennsylvania", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Rhode Island", "Rhode island"), "US, Rhode Island", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("South Carolina, USA", "Columbia, SC", "Charleston, SC"), "US, South Carolina", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c(), "US, South Dakota", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Tennessee, USA", "TN", "Nashville", "Memphis", "Memphis, TN"), "US, Tennessee", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Texas, USA", "Texas", "Austin", "Austin, TX", "Ostin", "All Over Texas", "City of San Antonio, TX", "Dallas", "Dallas, Texas", "Stonewall, TX", "Houston", "Houston, TX", "El Paso, Texas", "Dallas, TX"), "US, Texas", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Utah", "utah", "Salt Lake City"), "US, Utah", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c(), "US, Vermont", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Winchester, Virginia", "Richmond, VA"), "US, Virginia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("WA", "Washington", "Seattle, WA", "Seattle", "Stanwood city, WA, USA"), "US, Washington", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c(), "US, West Virginia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Wisconsin, USA", "Milwaukee", "Milwaukee, WI", "Madison"), "US, Wisconsin", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c(), "US, Wyoming", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Washington D.C", "Washington D.C.", "Washington, D.C.", "Washington, DC"), "US, Washington D.C.", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Guanica zona urbana, PR, USA"), "US, Unincorporated", users$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Troy, Alabama", "alabama", "AL"), "US, Alabama", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Alaska"), "US, Alaska", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Arizona, USA", "Arizona", "arizona", "ARIZONA", "City of Phoenix, Arizona", "Phoenix", "Mesa", "AZ"), "US, Arizona", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("arkansas"), "US, Arkansas", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Venice, California", "Redwood City, California", "San-Francisco", "Oakland, CA", "California", "California, USA", "CA", "UC Davis", "Santa Barbara, California", "San Francisco", "San Francisco, CA","SF", "San Diego", "San DIego, CA", "San Diego, United States", "Rancho Rinconada, CA, USA", "San Diego, CA", "Riverside", "Santa Monica", "Los Gatos, California", "Los Angeles, CA", "Los ANgeles", "los angeles", "Los-Angeles", "Los Angeles", "Hollywood", "Fowler, California"), "US, California", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("La Junta, Colorado", "Denver, CO", "Colorado"), "US, Colorado", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("New Haven"), "US, Conneticut", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Delaware, USA"), "US, Delaware", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Weeki Wachee, Florida", "USA, FL", "North Port, FL", "Destin, Florida", "Orlando", "Orlando, FL", "Tallahassee", "Miami", "Miami, FL", "Miami, USA", "jacksonville", "Jacksonville", "Florida, USA", "Florida"), "US, Florida", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("USA, Atlanta", "ATL", "ATL, GA", "Atlanta", "Atlanta, GA", "Atlanta, Georgia", "Macon, GA", "Georgia", "Georgia, USA", "Druid Hills, GA", "Downtown, Atlanta", "Brookhaven, GA"), "US, Georgia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c(), "US, Hawaii", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("ID"), "US, Idaho", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Aurora, Illinois", "Chicago", "Chicago, IL"), "US, Illinois", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("INDIANAPOLIS, USA"), "US, Indiana", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c(), "US, Iowa", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Wichita, KS", "Kansas", "Kansas, USA"), "US, Kansas", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Louisville"), "US, Kentucky", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Baton Rouge, LA", "New Orleans, LA", "New Orleans", "New Orlean", "Louisiana", "LA", "Lafayette, LA"), "US, Louisiana", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Brunswick, ME, USA"), "US, Maine", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Baltimore", "Baltimore, MD", "temple hills, md"), "US, Maryland", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Salem, Massachusetts", "Boston", "Boston, MA", "Boston, USA"), "US, Massachusetts", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Bloomfield Hills, Michigan", "Michigan", "Flint, MI", "Detroit", "Detroit, Michigan"), "US, Michigan", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("MN", "Mn", "Minnesota", "Minneapolis, MN", "Menisotta"), "US, Minnesota", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Jackson, MS", "Jackson"), "US, Mississippi", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("StLouis", "St Louis, MO", "Missouri, USA", "Kansas City, MO", "Ferguson, MO"), "US, Missouri", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Montana"), "US, Montana", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Nebraska, USA"), "US, Nebraska", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Vegas", "Nevada", "Las Vegas"), "US, Nevada", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("NH", "New Hampshire"), "US, New Hampshire", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("NJ", "Newark, NJ", "Camden, NJ", "New Jersey", "New Jersey, USA", "Old Bridge, New Jersey"), "US, New Jersey", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("NM", "Albuquerque", "Albuquerque, NM", "Eldorado at Santa Fe, NM, USA", "Los Alamos"), "US, New Mexico", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("NYC", "nyc", "NY City", "NY", "ny", "New York, USA", "New York, NY", "New York City", "New - York", "New-York", "Bronx, NY", "brooklyn", "Brooklyn", "Brooklyn, NY", "Brkln", "The Big Apple", "Queens, NY", "New York", "Manhattan, NY", "Garden City, NY", "Johnson City, New York", "East Aurora, New York", "Baldwinsville, New York", "Buffalo"), "US, New York", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("North Carolina", "Raleigh, North Carolina", "Greensboro"), "US, North Carolina", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("North Dakota"), "US, North Dakota", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Whitehall, Ohio", "Cincinnati, OH", "Cleveland, OH", "cleveland / ohio", "Cleve", "Columbus, Ohio", "Ohio", "Ohio, USA", "OH", "Montgomery", "Montgomery, Ohio", "Millville village, OH, USA", "Milford, Ohio", "Grove City, Ohio", "Green village, OH, USA", "City of Cleveland, USA", "Cincinnati"), "US, Ohio", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Oklahoma", "Oklahoma City", "Oklahoma, PA", "Oklahoma, USA"), "US, Oklahoma", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("portland", "Portland"), "US, Oregon", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Pittsburgh", "Pittsburgh, PA", "Pittsburgh, US", "Philadelhia", "Philadelphia", "Philadelphia, PA", "Philly", "Pennsylvania", "Mohnton, PA", "Chester, PA"), "US, Pennsylvania", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Rhode Island", "Rhode island"), "US, Rhode Island", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("South Carolina, USA", "Columbia, SC", "Charleston, SC"), "US, South Carolina", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c(), "US, South Dakota", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Tennessee, USA", "TN", "Nashville", "Memphis", "Memphis, TN"), "US, Tennessee", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Texas, USA", "Texas", "Austin", "Austin, TX", "Ostin", "All Over Texas", "City of San Antonio, TX", "Dallas", "Dallas, Texas", "Stonewall, TX", "Houston", "Houston, TX", "El Paso, Texas", "Dallas, TX"), "US, Texas", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Utah", "utah", "Salt Lake City"), "US, Utah", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c(), "US, Vermont", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Winchester, Virginia", "Richmond, VA"), "US, Virginia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("WA", "Washington", "Seattle, WA", "Seattle", "Stanwood city, WA, USA"), "US, Washington", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c(), "US, West Virginia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Wisconsin, USA", "Milwaukee", "Milwaukee, WI", "Madison"), "US, Wisconsin", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c(), "US, Wyoming", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Washington D.C", "Washington D.C.", "Washington, D.C.", "Washington, DC"), "US, Washington D.C.", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Guanica zona urbana, PR, USA"), "US, Unincorporated", users_eng$shortened_location)
   # Russland
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Krasnoyarsk", "Krasnoyarsk, Russia", "Ekaterinburg, Russia", "Chelyabinsk, Russia", "Volgograd", "Velikiy Novgorod, Russia", "Stavropol, Russia", "Ufa, Russia", "Rostov-na-Donu, Russia", "russia", "Russia", "Russian Empire", "novgorod", "Tomsk", "Republic of Chechnya, Russia", "Crimea, Russia", "Perm, Russia", "Penza", "Omsk, Russia", "Nizhniy Novgorod, Russia", "Murmansk, Russia", "Irkutsk", "Chelyaba", "belgorod", "✴Новгород✴", "Уфа", "Ульяновск", "Тула, Тульская область", "уфа", "ул. Ленина", "ростов-я-тону", "россия", "омск", "новосибирск", "новгород", "екб", "днищний дновгород", "Ярославль, Россия", "Ярославль", "Чита", "Чеченская республика, Россия", "Челябинск", "Челны", "Чебоксары, Россия", "Чебоксары", "Ханты-Мансийск", "Хабаровск, Россия", "Хабаровск", "Тула, Россия", "Тула", "Тува", "Томск", "Тольятти", "Тверь", "Тверское подворье", "Ташла", "Тамань", "Сраратов", "Сочи, Россия", "Сочи", "Смоленск", "Симферополь", "Саров", "Саратов )))", "Саратов", "Саранск", "Самара", "Рязань", "Ростов-на-Дону, Россия", "Ростов-на-Дону", "Ростов-На-Дону"), "Russia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Ростов", "Россия, Казань", "Россия", "Российская Федерация", "РФ", "Пятигорск", "Пенза", "Орел", "Омск, Россия", "Омск", "Нягань", "Мурманск", "Магадан", "Люберцы", "Луга", "Липецк", "Курск", "Красноярск", "Киров", "Кемерово", "Петрозаводск", "Пермь", "овосибирск, Россия", "Новосибирск", "Новосиб", "Новокузнецк, Россия", "Новгород", "Новосибирск, Россия", "Краснодар", "Котлас", "Кострома", "Кольский п-в", "Новосибирск, Россия", "Нижний Новогород", "Нижний Новгород", "Нижний", "Екатеринбург...", "Екатеринбург", "ЕКБ", "Ё-бург", "Нижний Новгород", "Нижний", "Набережные Челны, Россия", "Калуга, Россия", "Калуга", "Казань", "Калининград, Россия", "Калининград", "Иркутск", "Иваново", "Елец", "Барнаул, Россия"), "Russia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c( "Грозный", "Грозный", "Вся Россия", "Вся Россия", "Воронеж, Россия", "Воронеж", "Вологда", "Волгоград, Россия", "Волгоград, Вася!", "Волгоград", "Волгодонск, Россия", "Великий Новгород", "Брянск", "Белгород", "Башкартостан", "Архангельск, Россия", "Архангельск"), "Russia", users$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Krasnoyarsk", "Krasnoyarsk, Russia", "Ekaterinburg, Russia", "Chelyabinsk, Russia", "Volgograd", "Velikiy Novgorod, Russia", "Stavropol, Russia", "Ufa, Russia", "Rostov-na-Donu, Russia", "russia", "Russia", "Russian Empire", "novgorod", "Tomsk", "Republic of Chechnya, Russia", "Crimea, Russia", "Perm, Russia", "Penza", "Omsk, Russia", "Nizhniy Novgorod, Russia", "Murmansk, Russia", "Irkutsk", "Chelyaba", "belgorod", "✴Новгород✴", "Уфа", "Ульяновск", "Тула, Тульская область", "уфа", "ул. Ленина", "ростов-я-тону", "россия", "омск", "новосибирск", "новгород", "екб", "днищний дновгород", "Ярославль, Россия", "Ярославль", "Чита", "Чеченская республика, Россия", "Челябинск", "Челны", "Чебоксары, Россия", "Чебоксары", "Ханты-Мансийск", "Хабаровск, Россия", "Хабаровск", "Тула, Россия", "Тула", "Тува", "Томск", "Тольятти", "Тверь", "Тверское подворье", "Ташла", "Тамань", "Сраратов", "Сочи, Россия", "Сочи", "Смоленск", "Симферополь", "Саров", "Саратов )))", "Саратов", "Саранск", "Самара", "Рязань", "Ростов-на-Дону, Россия", "Ростов-на-Дону", "Ростов-На-Дону"), "Russia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Ростов", "Россия, Казань", "Россия", "Российская Федерация", "РФ", "Пятигорск", "Пенза", "Орел", "Омск, Россия", "Омск", "Нягань", "Мурманск", "Магадан", "Люберцы", "Луга", "Липецк", "Курск", "Красноярск", "Киров", "Кемерово", "Петрозаводск", "Пермь", "овосибирск, Россия", "Новосибирск", "Новосиб", "Новокузнецк, Россия", "Новгород", "Новосибирск, Россия", "Краснодар", "Котлас", "Кострома", "Кольский п-в", "Новосибирск, Россия", "Нижний Новогород", "Нижний Новгород", "Нижний", "Екатеринбург...", "Екатеринбург", "ЕКБ", "Ё-бург", "Нижний Новгород", "Нижний", "Набережные Челны, Россия", "Калуга, Россия", "Калуга", "Казань", "Калининград, Россия", "Калининград", "Иркутск", "Иваново", "Елец", "Барнаул, Россия"), "Russia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c( "Грозный", "Грозный", "Вся Россия", "Вся Россия", "Воронеж, Россия", "Воронеж", "Вологда", "Волгоград, Россия", "Волгоград, Вася!", "Волгоград", "Волгодонск, Россия", "Великий Новгород", "Брянск", "Белгород", "Башкартостан", "Архангельск, Россия", "Архангельск", "☼Новосибчик☼"), "Russia", users_eng$shortened_location)
   # Aufsplittung in mehrere Befehle umgeht komische Sytax-Fehler
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Russia, Moscow", "moscow city", "Moscow-City", "Moscow", "msk", "Msk", "MSK", "MSK SAO", "★москва", "Moscow, Russia", "moscow", "Москва♥", "Москоу-сити", "осква, Россия", "Москва Златоглавая", "Москва Белокаменная", "Москва (СССР - Россия)", "Москва - столица", "Москва - Самара", "Москва - Лондон", "Москва", "Моска", "мск", "москва", "Туапсе, Москва", "Серпухов", "Севастополь", "Россия, Москва", "Пушкино", "Псков", "Подольск", "Одинцово", "Москва, Россия", "МСКВА", "МСК", "Коломна", "Перово", "МSK", "Дмитров"), "Russia, Moscow", users$shortened_location) # Moskau-Stadt + Oblast
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("St-Petersburg", "St. Petersburg", "st.petersburg", "St.Petersburg", "st/petersburg", "Saint Petersburg, Russia", "Saint Petersburg", "saint-petersburg", "Saint-Peterburg", "saint P.", "saint p.", "Saint-P.", "Saint-P", "St.P", "St.P.", "St-P", "SPb♥○•°•☆", "SPB", "SPb", "spb", "cанкт-петербург", "спб", "Спб", "Сестрорецк, Россия", "Санкт-петербург", "Санкт-Петербург, Россия", "Россия Санкт-Петербург", "Санкт-Петербург", "СПб", "СПБГПУ", "СПБ", "С.Петербург", "С-Пб", "Пушкин, Санкт-Петербург", "Пушкин", "ПЕТЕРБУРГ", "Лос-Питербургос", "Ленинград", "Кронштадт", "Кингисепп", "Петроград", "Петербург", "Выборг"), "Russia, St.Petersburg", users$shortened_location) # St.Petersburg + Oblast Leningrad
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Russia, Moscow", "moscow city", "Moscow-City", "Moscow", "msk", "Msk", "MSK", "MSK SAO", "★москва", "Moscow, Russia", "moscow", "Москва♥", "Москоу-сити", "осква, Россия", "Москва Златоглавая", "Москва Белокаменная", "Москва (СССР - Россия)", "Москва - столица", "Москва - Самара", "Москва - Лондон", "Москва", "Моска", "мск", "москва", "Туапсе, Москва", "Серпухов", "Севастополь", "Россия, Москва", "Пушкино", "Псков", "Подольск", "Одинцово", "Москва, Россия", "МСКВА", "МСК", "Коломна", "Перово", "МSK", "Дмитров"), "Russia, Moscow", users_eng$shortened_location) # Moskau-Stadt + Oblast
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("St-Petersburg", "St. Petersburg", "st.petersburg", "St.Petersburg", "st/petersburg", "Saint Petersburg, Russia", "Saint Petersburg", "saint-petersburg", "Saint-Peterburg", "saint P.", "saint p.", "Saint-P.", "Saint-P", "St.P", "St.P.", "St-P", "SPb♥○•°•☆", "SPB", "SPb", "spb", "cанкт-петербург", "спб", "Спб", "Сестрорецк, Россия", "Санкт-петербург", "Санкт-Петербург, Россия", "Россия Санкт-Петербург", "Санкт-Петербург", "СПб", "СПБГПУ", "СПБ", "С.Петербург", "С-Пб", "Пушкин, Санкт-Петербург", "Пушкин", "ПЕТЕРБУРГ", "Лос-Питербургос", "Ленинград", "Кронштадт", "Кингисепп", "Петроград", "Петербург", "Выборг"), "Russia, St.Petersburg", users_eng$shortened_location) # St.Petersburg + Oblast Leningrad
   # Sonstige Länder
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Kiel, Schleswig-Holstein", "Köln, Deutschland", "Hessen, Deutschland", "Hamburg, Deutschland", "Frankfurt am Main, Deutschland", "Frankfurt am Main, Hessen", "Erfurt, Deutschland", "Düsseldorf, Deutschland", "Dresden, Sachsen", "Bremen, Deutschland", "Berlin, Deutschland", "Stuttgart, Deutschland", "Rostock, Deutschland", "Saarbrücken, Deutschland", "Deutschland", "München, Bayern", "Magdeburg, Deutschland", "Köln, Deutschland", "Потсдам"), "Germany", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("UK", "Newcastle", "Newport", "Manchester", "London", "London, England", "London, UK", "Liverpool", "Coventry"), "United Kingdom", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Italy", "Italia", "italia", "Milano, Lombardia", "Itala, Sicilia"), "Italy", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Paris", "Paris, France", "Lyon"), "France", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Brussel, België"), "Belgium", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Стокгольм"), "Sweden", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Украина", "Покровское", "Одесса", "Мариуполь", "Луцк", "Луганск", "Кременчуг", "Київ", "Киев", "Запорожье", "Житомир", "Донецк, Россия", "Донецк", "Днепр, Украина", "Днепр"), "Ukraine", users$shortened_location) # Krim zu Russland, Donetsk zu Ukraine
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Таллин"), "Estonia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Прага"), "Czechia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Мінск", "Витебск", "Беларусь"), "Belarus", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Стамбул"), "Turkey", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Cairo, Egypt", "مصر"), "Egypt", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Beirut", "لبنان", "بيروت"), "Lebanon", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("العراق"), "Iraq", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("баку"), "Azerbaijan", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("syria", "Syria", "Damascus", "Aleppo", "سورية", "دمشق", "سوريا", "حماة", "حمص"), "Syria", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Oliva Pizza & Pasta // Amman", "Zarqa, Jordan", "Amman", "Az-Zarqa", "حلب", "اللاذقية", "المملكة الأردنية الهاشمية", "الأردن"), "Jordan", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("الدمام"), "Saudi-Arabia", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Манила"), "Philippines", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Manama, Bahrain"), "Bahrain", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("عمان"), "Oman", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Пхеньян"), "North Korea", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("katamandu"), "Nepal", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("ZM"), "Zambia", users$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Kiel, Schleswig-Holstein", "Köln, Deutschland", "Hessen, Deutschland", "Hamburg, Deutschland", "Frankfurt am Main, Deutschland", "Frankfurt am Main, Hessen", "Erfurt, Deutschland", "Düsseldorf, Deutschland", "Dresden, Sachsen", "Bremen, Deutschland", "Berlin, Deutschland", "Stuttgart, Deutschland", "Rostock, Deutschland", "Saarbrücken, Deutschland", "Deutschland", "München, Bayern", "Magdeburg, Deutschland", "Köln, Deutschland", "Потсдам", "Germany"), "Germany", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("UK", "Newcastle", "Newport", "Manchester", "London", "London, England", "London, UK", "Liverpool", "Coventry", "United Kingdom"), "United Kingdom", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Italy", "Italia", "italia", "Milano, Lombardia", "Itala, Sicilia"), "Italy", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Paris", "Paris, France", "Lyon", "France"), "France", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Greece"), "Greece", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Brussel, België"), "Belgium", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Стокгольм"), "Sweden", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Украина", "Покровское", "Одесса", "Мариуполь", "Луцк", "Луганск", "Кременчуг", "Київ", "Киев", "Запорожье", "Житомир", "Донецк, Россия", "Донецк", "Днепр, Украина", "Днепр"), "Ukraine", users_eng$shortened_location) # Krim zu Russland, Donetsk zu Ukraine
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Таллин"), "Estonia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Прага"), "Czechia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Мінск", "Витебск", "Беларусь"), "Belarus", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Стамбул"), "Turkey", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Mexico"), "Mexico", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Cairo, Egypt", "مصر", "Egypt"), "Egypt", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Beirut", "لبنان", "بيروت"), "Lebanon", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("العراق"), "Iraq", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Kuwait"), "Kuwait", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("баку"), "Azerbaijan", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("syria", "Syria", "Damascus", "Aleppo", "سورية", "دمشق", "سوريا", "حماة", "حمص"), "Syria", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Oliva Pizza & Pasta // Amman", "Zarqa, Jordan", "Amman", "Az-Zarqa", "حلب", "اللاذقية", "المملكة الأردنية الهاشمية", "الأردن"), "Jordan", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("الدمام"), "Saudi-Arabia", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Манила"), "Philippines", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Manama, Bahrain"), "Bahrain", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("عمان"), "Oman", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Пхеньян"), "North Korea", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("katamandu"), "Nepal", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("ZM"), "Zambia", users_eng$shortened_location)
   # Other
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Universe", "Wonderland", "sin city", "Love Town", "Liberty City", "Fattyland", "garage", "hood", "I AM A CITIZEN OF THE UNIVERSE", "Islamic States of America", "dreamland", "Black America", "хогвортс", "Cosmopolitanism", "2148", "الدولة الإسلامية", "мой мир", "амфетаминовая столица", "Я везде", "Черемухи", "ЦАО", "Третий Рим",  "Раша", "Работа))", "Мечтовиль", "Мечта", "Красти Бургер", "Артем", "#РусскийМир"), "Other", users$shortened_location)
-  users$shortened_location <- ifelse(users$user_reported_location %in% c("Newhustle", "vladik", "Man", "piter", "Jersey", "KN", "Birmingham", "Cromwell", "ширкино", "Ch", "сжигай толерантный рай,слышишь", "сейчас орел", "Таллин, Санкт-Петербург", "Сибирь матушка", "Северная столица", "♠Питер♠", "питер", "Питер", "Новгород - СПб", "НН", "Владик ДВФУ", "Вильнюс - Москва", "Ватноград", "Бутово", "Адлер", "Adler", "☼Новосибчик☼"), "Unidentified", users$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Universe", "Wonderland", "sin city", "Love Town", "Liberty City", "Fattyland", "garage", "hood", "I AM A CITIZEN OF THE UNIVERSE", "Islamic States of America", "dreamland", "Black America", "хогвортс", "Cosmopolitanism", "2148", "الدولة الإسلامية", "мой мир", "амфетаминовая столица", "Я везде", "Черемухи", "ЦАО", "Третий Рим",  "Раша", "Работа))", "Мечтовиль", "Мечта", "Красти Бургер", "Артем", "#РусскийМир"), "Other", users_eng$shortened_location)
+  users_eng$shortened_location <- ifelse(users_eng$user_reported_location %in% c("Newhustle", "vladik", "Man", "piter", "Jersey", "KN", "Birmingham", "Cromwell", "ширкино", "Ch", "сжигай толерантный рай,слышишь", "сейчас орел", "Таллин, Санкт-Петербург", "Сибирь матушка", "Северная столица", "♠Питер♠", "питер", "Питер", "Новгород - СПб", "НН", "Владик ДВФУ", "Вильнюс - Москва", "Ватноград", "Бутово", "Адлер", "Adler"), "Unidentified", users_eng$shortened_location)
+  users_eng$shortened_location[2464] <- "Russia"
 }
-table(users$shortened_location)
-sum(is.na(users$shortened_location))
+sum(is.na(users_eng$shortened_location))
+table(is.na(users_eng$shortened_location) == is.na(users_eng$user_reported_location)) # keine neuen Missings
 
-length(grep("US,", users$shortened_location))
-length(grep("US,", users$shortened_location)) / length(grep("US", users$shortened_location)) *100
-sort(table(users$shortened_location[grep("US,", users$shortened_location)]), decreasing = T)
-# Knapp 44% der US-Amerikaner haben eine genauere Ortsngabe als nur "USA" oder vergleichbares getätigt, es lässt sich jedoch keine politische Tendenz (Republikanisch/Demokratisch bzw. Swing States) erkennen.
+table(users_eng$shortened_location)
 
+length(grep("US,", users_eng$shortened_location))
+length(grep("US,", users_eng$shortened_location)) / length(grep("US", users_eng$shortened_location)) *100
+sort(table(users_eng$shortened_location[grep("US,", users_eng$shortened_location)]), decreasing = T)
+# Knapp 44% der US-Amerikaner haben eine genauere Ortsangabe als nur "USA" oder vergleichbares getätigt, es lässt sich jedoch keine politische Tendenz (Republikanisch/Demokratisch bzw. Swing States) erkennen.
+sort(table(users_eng$shortened_location[grep("Russia", users_eng$shortened_location)]), decreasing = T)
+# Interessanterweise Konzentrierung in russischen Daten: Fast genausoviele Angaben für Moskau wie für Russland generell, halb so viele Angaben für St.Petersburg
 
-#Grouping
-arabic <- length(grep("Bahrain", users$shortened_location)) + length(grep("Egypt", users$shortened_location)) + length(grep("Lebanon", users$shortened_location)) + length(grep("Iraq", users$shortened_location)) + length(grep("Syria", users$shortened_location)) + length(grep("Jordan", users$shortened_location)) + length(grep("Saudi-Arabia", users$shortened_location)) + length(grep("Oman", users$shortened_location))
-easteuro <- length(grep("Belarus", users$shortened_location)) + length(grep("Czechia", users$shortened_location)) + length(grep("Estonia", users$shortened_location)) + length(grep("Ukraine", users$shortened_location)) + length(grep("United Kingdom", users$shortened_location))
-westeuro <- length(grep("Belgium", users$shortened_location)) + length(grep("France", users$shortened_location)) + length(grep("Germany", users$shortened_location)) + length(grep("Italy", users$shortened_location)) + length(grep("Sweden", users$shortened_location))
-other <- length(grep("Azerbaijan", users$shortened_location)) + length(grep("Nepal", users$shortened_location)) + length(grep("North Korea", users$shortened_location)) + length(grep("Philippines", users$shortened_location)) + length(grep("Turkey", users$shortened_location)) + length(grep("Zambia", users$shortened_location))
-
-loc1 <- c("US", "Russia", "Arabic", "East Europe", "West Europe", "other", "Fantasy", "NA")
-loc2 <- c(length(grep("US", users$shortened_location)), length(grep("Russia", users$shortened_location)), arabic, easteuro, westeuro, other, (length(grep("Unidentified", users$shortened_location)) + length(grep("Fantasy", users$shortened_location)) + length(grep("Other", users$shortened_location))), sum(is.na(users$shortened_location)))
-loclang <- loclang %>% mutate(location = loc1, location_n = loc2)
-rm(arabic, easteuro, westeuro, other, loc1, loc2)
-loclang$location_perc <- loclang$location_n / nrow(users) *100
-loclang
-# Konsistenz zwischen den Spracheinstellungen und Ortsangaben. Englisch (en) überwiegt bei den Sprachen zwar deutlich im Vergleich mit den angegebene Orten, aber da englisch global dominant ist, ist davon auszugehen, dass auch Nutzer in anderen Ländern ihre Accounts auf englisch einstellen (-> Europa) - oder dass es einfach die Standardeinstellung ist, und diese Nutzer sie nie geändert haben. Der deutliche Anstieg in Osteuropa lässt sich durch die Tatsache erklären, dass bis auf zwei ukrainisch-sprachige Angaben (was sich mit den languages deckt) alle Ortsangaben aus diesem Gebiet auf russisch waren.
 
 
 ### Account-Erstelldaten
@@ -226,152 +251,127 @@ for(i in 10:18){
 rm(i, q, year)
 quartals <-  quartals[1:39]
 
-ggplot(users, aes(x = account_creation_date, fill = account_language)) + geom_histogram(breaks = quartals) + 
+ggplot(users_eng, aes(x = account_creation_date, fill = account_language)) + geom_histogram(breaks = quartals) + 
   scale_fill_manual(name = "Sprache", values = c("#189159", "#BEA310", "#F8766D", "#D35130", "#915123", "#BE6D10",
                                                  "#4D9E22", "#AE8046", "#619CFF", "#4A3FC6", "#00BA38"),
                     labels = c("Arabisch", "Deutsch", "Englisch", "Englisch (GB)", "Spanisch", "Französisch",
                                "Indonesisch", "Italienisch", "Russisch", "Ukrainisch", "Chinesisch")) +
   labs(x = "Quartal", y = "Anzahl Accounts", title = "Erstelldatum aller Accounts, gruppiert nach Quartal und Account-Sprache") + theme_minimal()
-# Der Großteil der Accounts wurde im Zeitraum 2. Häfte 2013 - 1. Häfte 2014 erstellt - lange vor dem US-Wahlkampf 2016. Mögliche Erklärungen: Zeitnutzung, um Accounts als "seriös" zu etablieren, oder Nutzung der Accounts zur Beeinflussung anderer Themen als der Wahl.
-table(users$account_creation_date < "2013-06-01")
-table(users$account_creation_date > "2014-06-01")
-(2199-121) / nrow(users) *100
-# 121 Accounts wurden vor dieser Spitze erstellt, 2078 bzw. 57,6% in dieser Spitze.
-min(users$account_creation_date); max(users$account_creation_date)
+# Der Großteil der Accounts wurde im Zeitraum 2. Häfte 2013 - 1. Häfte 2014 erstellt - lange vor dem US-Wahlkampf 2016, und sowohl für englische als auch für russische Accounts. Mögliche Erklärungen: Zeitnutzung, um Accounts als "seriös" zu etablieren, oder Nutzung der Accounts zur Beeinflussung anderer Themen als der Wahl.
+table(users_eng$account_creation_date < "2013-06-01")
+table(users_eng$account_creation_date > "2014-06-01")
+(1 - (98 + 1103) / nrow(users_eng)) *100
+# 98 Accounts wurden vor und 1103 nach dieser Spitze erstellt, 1876 bzw. 61% in dieser Spitze.
+min(users_eng$account_creation_date); max(users_eng$account_creation_date)
+min(tweets_eng$tweet_time); max(tweets_eng$tweet_time)
+# Beinahe 10 Jahre an Accounts und Tweets finden sich in den Daten
+rm(quartals)
 
-activity <- data.frame(userid = users$userid, cration = users$account_creation_date, tweets = 0)
-for(i in 1:nrow(users)){
-  twe <- tweets %>% filter(userid == users$userid[i])
+
+### Account-Aktivitäten
+activity <- data.frame(userid = users_eng$userid, cration = users_eng$account_creation_date, tweets = 0)
+for(i in 1:nrow(users_eng)){
+  twe <- tweets_eng %>% filter(userid == users_eng$userid[i])
   if(nrow(twe) != 0){
     activity[i, 3] <- nrow(twe)
     activity[i, 4] <- as.Date(min(twe$tweet_time))
     activity[i, 5] <- as.Date(max(twe$tweet_time))
   }
-}
+} # This might take a while
 names(activity) <- c("userid", "creation", "tweets", "first.post", "last.post")
 rm(twe)
 activity <- activity %>% mutate(sleep = as.integer(first.post - creation), active = as.integer(last.post-first.post + 1))
 summary(activity$sleep)
 summary(activity$active)
+ggplot(activity, aes(x = active)) + geom_histogram(bins = 75) + 
+  scale_x_continuous(trans = "sqrt", breaks = c(10, 100, 250,500, 1000, 1500, 2000, 2500, 3000)) +
+  labs(x = "Tage an Aktivität des Accounts", y = "Anzahl") + theme_min
+# Dominante Menge an Accounts sind nur ein, zwei Tage aktiv. Nur minimaler Anteil an Accounts sind über 1.000 Tage aktiv
+ggplot(activity, aes(x = sleep)) + geom_histogram(bins = 75) +
+  scale_x_continuous(trans = "sqrt", breaks = c(10, 100, 250,500, 1000, 1500, 2000, 2500, 3000)) +
+  labs(x = "Tage seit Account-Erstellung bis zu erstem Post", y = "Anzahl")
+# Deutlich weniger Klarheit in Inaktivität vor erstem Post. Viele Accounts sind sofort aktiv, aber es gibt Gruppen mit lokalen Maxima um 250, 500 und 800 Tage Inaktivität
+
+
 
 ggplot(activity, aes(x = active, y = sleep, color = tweets)) + geom_point() + theme_minimal() +
   scale_x_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 2000, 3000)) + 
   scale_y_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 1500, 2000)) + 
-  scale_color_binned(trans = "sqrt", low = "blue", high = "red", breaks = c(1, 100, 500, 3000, 12000, 30000),
+  scale_color_binned(trans = "sqrt", low = "blue", high = "red", breaks = c(20, 500, 3000, 12000, 30000),
                      name = "Anzahl an\nTweets") +
-  labs(title = "Aktivitätszeiträume der Accounts nach Zahl abgesetzter Tweets", 
-       x = "Tage an Aktivität des Accounts", y = "Tage seit Account-Erstellung bis zu erstem Post")
-# Missing Rows: Accounts ohne einen einzigen abgesetzten Tweet
+  labs(x = "Tage an Aktivität des Accounts", y = "Tage seit Account-Erstellung bis zu erstem Post")
 
+as.Date_origin <- function(x){as.Date(x, origin = '1970-01-01')}
+ggplot(activity, aes(x = active, y = sleep, color = creation)) + geom_point() + theme_minimal() +
+  scale_x_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 2000, 3000)) + 
+  scale_y_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 1500, 2000)) + 
+  scale_colour_gradientn(colours=c('red','green','blue'), labels=as.Date_origin, name = "Erstelldatum", n.breaks = 6) +
+  labs(x = "Tage an Aktivität des Accounts", y = "Tage seit Account-Erstellung bis zu erstem Post")
 # Über lange Zeiträume genutzte Accounts wurden meist direkt nach Ertstellung aktiv, während Accounts, die nur wenige Tage benutzt wurden eher lange auf diese kurze Aktivität "warteten" Zudem lässt sich ein beinahe viereckiger Kasten aus Accounts bis 1000 Tage Aktivität und bis 600 Tage vor erstem Post erkennen. Diese Beobachtung ist insbesondere einer Gruppe an Acocunts, die um die 500 Tage nach Erstellung aktiv wurden und in Aktivität sowie Anzahl abgesetzter Tweets stark schwanken, zu verdanken.
 # Zusätzlich lässt sich erkennen, dass Accounts mit längerer Aktivitätszeit auch im Schnitt mehr Tweets absetzen, was von einer konstanten Aktivität ausgehen lässt.
+# Zusätzlich lässt sich festhalter, dass neuere Accounts im Schnitt nur wenige Tage vor ihrem ersten Post inaktiv sind.
+rm(activity, i, as.Date_origin)
+
 
 
 ### Gefolgte Accounts
-hist(users$following_count)
-hist(log2(users$following_count))
-summary(users$following_count)
-# Ein Großteil der Accounts folgt nur ein paar Hundert Accounts (wenn überhaupt), während einige wenige Accounts mehreren zehntausend Accounts folgen -> Wahrscheinlich Nutzung von Follow-Bots, um Nummern zu erhöhen.
+hist(users_eng$following_count)
+hist(log2(users_eng$following_count))
+summary(users_eng$following_count)
+# Ein Großteil der Accounts folgt nur ein paar Hundert Accounts (wenn überhaupt), während einige wenige Accounts mehreren zehntausend Accounts folgen -> Wahrscheinlich Nutzung von Follow-Bots, um eigene Nummern zu erhöhen.
 
-followbots <- users[which(users$following_count >= 5000), ]
+# Suche nach Cutoff-Punkt, Umschwung natürliches Wachstum -> Followbots
+lm_seq <- seq(500, 5000, 100)
+lm_df <- data.frame(n = lm_seq, adr_follow = 0, adr_no = 0, rem = 0)
+for(i in 1:length(lm_seq)){
+  followbots <- users_eng[which(users_eng$following_count >= lm_seq[i]), ]
+  followbots <- followbots[, 7:8]
+  lm_df$rem[i] <- nrow(followbots)
+  lm <- summary(lm(followbots$follower_count ~ followbots$following_count))
+  lm_df$adr_follow[i] <- lm$adj.r.squared
+  nobots <- users_eng[which(users_eng$following_count < lm_seq[i]), ]
+  nobots <- nobots[, 7:8]
+  lm <- summary(lm(nobots$follower_count ~ nobots$following_count))
+  lm_df$adr_no[i] <- lm$adj.r.squared
+}
+rm(followbots, nobots, i, lm_seq, lm)
+lm_df %>% ggplot(aes(x = n)) + geom_line(aes(y = adr_follow, color = "Follows > N")) + 
+  geom_line(aes(y = adr_no, color = "Follows < N")) +
+  labs(x = "Zahl eigener Follows", y = "adj. R^2", color = "")
+lm_df$n[which(lm_df$adr_follow == max(lm_df$adr_follow))]
+# Ab 2.800 eigenen Follows ist davon auszugehen, dass Accounts followbots nutzen, da an diesem Punkt die Varianzaufklärung maximiert ist. Der relativ lineare Abfall für N > 2800 lässt sich vermutlich dadurch erklären, dass tatsächliche Followbot-Nutzer in die Gruppe der Nicht-Nutzer einsortiert werden.
+followbots <- users_eng[which(users_eng$following_count >= 2800), ]
 followbots <- followbots[, 7:8]
-followbots
-nobots <- users[which(users$following_count < 5000), ]
+nobots <- users_eng[which(users_eng$following_count < 2800), ]
 nobots <- nobots[, 7:8]
 summary(lm(followbots$follower_count ~ followbots$following_count))
-summary(lm(nobots$follower_count~ nobots$following_count))
-# Für die Accounts, die über 10.000 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für alle 3.608 Accounts die Anzahl gefolgter Accounts gut 25% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,246), ist es für die Accounts mit über 10.000 Follows eine Varianzaufklärung von über 60% (adj. R^2 = 0,611)!
+summary(lm(nobots$follower_count ~ nobots$following_count))
+# Für die Accounts, die über 2.800 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für die 2.895 Accounts unter 2.800 Follows die Anzahl gefolgter Accounts nur knapp über 1% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,011), ist es für die Accounts mit über 2.800 Follows eine Varianzaufklärung von über 70% (adj. R^2 = 0,71)! Zusätzlich ist für beide Account-Gruppen ersichtlich, dass sie ab mehreren hundert Followern im Schnitt mehr Follower haben, als sie selbst followen, da in beiden Fällen für jeden Follow 1,5 bzw. 1,6 eigene Follower hinzukommen.
+rm(followbots, nobots, lm_df)
 
-
-
-# Analyse Tweets ----
 
 ### Tweet-Zeiten
-times <- tibble(dt = tweets$tweet_time %>% ymd_hms()) %>%
+times <- tibble(dt = tweets_eng$tweet_time %>% ymd_hms()) %>%
   mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
+# Will definitely take time
 ggplot(times, aes(x = timeset)) + geom_bar() + theme_minimal() + 
   labs(title = "Tweets nach UTC-Zeit, alle Tweets", x = "Uhrzeit (Stunden)", y = "Anzahl Tweets")
-#Es gibt deutlich erkennbare Muster in den Tweetzeiten. So werden eine große Menge Tweets zwischen 07:00 und 17:00 UTC abgesetzt, während zwischen 21:00 und 06:00 UTC bedeutend weniger Tweets verfasst wurden.
+
+#Es gibt deutlich erkennbare Muster in den Tweetzeiten. So werden eine große Menge Tweets zwischen 12:00 und 19:00 UTC abgesetzt, während zwischen 4:00 und 08:00 UTC bedeutend weniger Tweets verfasst wurden.
+
 #Das bedeutet, dass die Großzahl der Tweets nach amerikanischer Sicht zwischen 03:00 und 13:00 (Ostküste) bzw. 00:00 und 10:00 (Westküste) verfasst wurden. Geht man von russischen Verfassern aus, so liegt die Hochfrequenz zwischen 10:00 und 20:00 (Moskau/St. Petersburg). Es gibt also entweder Hochzeiten während der Morgensunden in Amerika oder während den Arbeitsstunden in West-Russland.
 
-times_eng <- tweets %>% filter(tweet_language %in% c("en")) %>% tibble(dt = tweet_time %>% ymd_hms()) %>%
-  mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
-ggplot(times_eng, aes(x = timeset)) + geom_bar() + theme_minimal() +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22),
-                     labels = c("00:00", "02:00", "04:00", "06:00", "08:00", "10:00", 
-                                "12:00", "14:00", "16:00", "18:00", "20:00", "22:00")) +
-  labs(title = "Tweets nach Uhrzeit, englischsprachige Tweets", x = "Uhrzeit (UTC)", y = "Anzahl Tweets")
-# Filtert man nur nach englischsprachigen Tweets, so verschiebt sich das Maximum auf 13:00-17:00 UTC, mit einem Minimum zwischen 03:00-07:00 UTC.
-#Somit sind die Minima bei 20:00-01:00 (Westküste) und 23:00-04:00 (Ostküste), bzw. 6:00-11:00 (Moskau) und die Maxima bei 06:00-01:00 (Westküste) und 09:00-04:00 (Ostküste), bzw. 16:00-21:00 (Moskau).
 
-
-### Tweet-Sprachen nach Account
-
-# Analyse der Anzahl englisch-/russischsprachiger Tweets für alle Accounts in den Daten, um nach sprachlicher EInheitlichkeit oder systematischen Veränderungen zu suchen. Aufgrund der großen Account-Anzahl (3608) aufgesplittet in mehrere Plots. Sollte sich im Plot-Fenster nach Ausführen des Print-Befehls kein Ergebnis zeigen, so kann es helfen, dieses zu vergrößern. Eine tatsächliche Analyse der Grafiken ist in RStudio selbst nicht möglich, die Dateien können jedoch als PDF exportiert und dann betrachtet werden - Exportmaße von ca. 40x80″ werden empfohlen.
-{
-  langplot_1 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1:600]) %>%
-    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-  langplot_2 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[601:1200]) %>%
-    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-  langplot_3 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1201:1800]) %>%
-    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-  langplot_4 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[1801:2400]) %>%
-    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-  langplot_5 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[2401:3000]) %>%
-    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-  langplot_6 <- tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[3001:3608]) %>%
-    mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-    ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-    scale_fill_manual(values = c("en" = "red", "ru" = "blue", "other" = "green")) + 
-    theme(legend.position = "none") + facet_wrap(~ userid, ncol = 30, scales = "free_y") + theme_minimal()
-  }
-# save("Saved Files/user-languages_ggplot.RData")
-# DATEIEN LADEN: load("Saved Files/user-languages_ggplot.RData")
-
-print(langplot_1)
-print(langplot_2)
-print(langplot_3)
-print(langplot_4)
-print(langplot_5)
-print(langplot_6)
-rm(langplot_1, langplot_2, langplot_3, langplot_4, langplot_5, langplot_6)
-# Relative Einheitlichkeit über die Zeit für alle Accounts. Vereinzelte russische Tweets in dominant englischen Accounts und anders herum, aber keine systemischen Veränderungen sichtbar. Zusätzlich zeigt sich, dass viele Accounts nur für vergleichsweise kurze Zeit aktiv waren. Auch scheint immer wieder ein kleiner Anzeigefehler aufzutauchen, dieser wirkt sich aber bei genauerer Betrachtung nicht wirklich auf die sichtbaren Ergebnisse aus.
-
-# Grafik: Zufalls-Sample von 16 Accounts:
-# vec <- sample(1:nrow(users), size = 16), Ergebnis:
-vec <- c(1436, 1260, 2582, 728, 421, 273, 1188, 170, 945, 896, 3128, 2248, 2602, 1522, 1872, 3062)
-tweets %>% select(c(userid, tweet_language, tweet_time)) %>% filter(userid %in% users$userid[vec]) %>%
-  mutate(tweet_language =  ifelse(tweet_language == "en" | tweet_language == "ru", tweet_language, "other")) %>%
-  ggplot(aes(x = as.Date(tweet_time), fill = tweet_language)) + geom_histogram() +
-  scale_fill_discrete(name = "Sprache", labels = c("Englisch", "Andere", "Russisch", "Undefiniert")) + 
-  labs(x = "Datum", y = "Anzahl Tweets", title = "Tweet-Sprachen 16 zufällig ausgewählter Accounts") +
-  facet_wrap(~ userid, ncol = 4, scales = "free_y") + theme_minimal()
-# Manuelle Verschiebung der Legende unter die Grafik, da theme.position = "bottom" nicht zu funktionieren scheint.
 
 
 ### Tweets vs. Retweets
 
 #Zwei Graphen: Tweets/Retweets vs. Followerzahl, Tweets/Retweets vs. Tweetzahl
-tweet_rts <- tweets %>% select(userid, is_retweet)
-user_rts <- data.frame(users$userid, users$follower_count)
+tweet_rts <- tweets_eng %>% select(userid, is_retweet)
+user_rts <- users_eng %>% select(userid, follower_count)
 
-for(i in 1:nrow(users)){
-  id <- users$userid[i]
+for(i in 1:nrow(users_eng)){
+  id <- users_eng$userid[i]
   df <- tweet_rts %>% filter(userid == id)
   rt <- df %>% filter(is_retweet == TRUE)
   user_rts[i, 3] <- nrow(df)
@@ -379,55 +379,47 @@ for(i in 1:nrow(users)){
 } # kann einen kurzen Moment dauern
 user_rts[, 5] <- user_rts[, 4] / user_rts[, 3]
 names(user_rts) <- c("userid", "followers", "postcount", "retweets", "rtpercent")
-table(is.nan(user_rts$rtpercent))
-# 129 Accounts ohne jegliche Postings
-user_rts %>% filter(is.nan(user_rts$rtpercent)) %>% ggplot(aes(x = followers)) + geom_histogram() + theme_minimal()
-# Großteil mit 0 Followern, aber doch einige Accounts, die mehrere hundert FOllower angesammelt haben.
-user_rts <- user_rts[!(is.nan(user_rts$rtpercent)), ]
 
+# Anteil Retweets an allen Postings eines Users
 user_rts %>% ggplot(aes(x = rtpercent)) + geom_histogram(bins = 100) + 
-  labs(x = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users") +
+  labs(x = "Anteil Retweets") +
   theme_minimal() + scale_y_continuous(trans = "sqrt")
-#Die große Mehrheit der Accounts setzt auf eigene Postings und wenige bis gar keine Retweets, während einige Accounts nur aus Retweets zu bestehen scheinen. Auffällig ist auch eine Ansammlung an Accounts um die 85-90% Retweet-Rate.
+#Die große Mehrheit der Accounts setzt auf eigene Postings und wenige bis gar keine Retweets, während einige Accounts nur aus Retweets zu bestehen scheinen. Auffällig sind auch einzelne Spikes und eine Ansammlung an Accounts um die 85-95% Retweet-Rate.
 
-user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = postcount)) + geom_point() + 
-  scale_color_continuous(trans = "sqrt") +
-  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "sqrt") +
-  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
-       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") + theme_minimal()
+# Anteil Retweets an allen Postings eines Users
+user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = postcount)) + geom_point() +
+  scale_color_gradient(trans = "sqrt", low = "dark red", high = "green", 
+                       breaks = c(2500, 10000, 25000, 50000, 100000)) +
+  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "sqrt", 
+                     breaks = c(1000, 10000, 25000, 50000, 100000, 200000)) +
+  labs(y = "Anteil Retweets", color = "Anzahl\nTweets")
 # Accounts mit vielen Followern (fünfstellig und aufwärts) setzen hauptsächlich auf eigene Tweets und retweeten wenig. Mit zunehmender Follower-Zahl gent die Anzahl an Retweets weiter zurück.
+user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = postcount)) + geom_point() +
+  scale_color_gradient(trans = "sqrt", low = "dark red", high = "green", 
+                       breaks = c(2500, 10000, 25000, 50000, 100000, 100000)) +
+  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "log", 
+                     breaks = c(1, 10, 100, 1000, 10000, 100000)) +
+  labs(y = "Anteil Retweets", color = "Anzahl\nTweets")
+# Es zeigt sich ein leichter Unterschied in der Follower-Zahl zwischen den Gruppen mit beinahe gar keinen Retweets und der Gruppe mit fast ausschließlich Retweets. Während sich im Bereich 10-100 eine Gruppe an Accounts mit nahe 0 Retweets findet, existiert eine ähnliche Gruppe mit >90% Retweets im Bereich um die 1.000 Follower.
 
-user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = rtpercent)) + geom_point() + 
-  scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "log") +
-  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
-       subtitle = "Aufgeteilt nach Followerzahl des Nutzers") + theme_minimal()
-# Es zeigt sich kein deutlicher Unterschied in der Follower-Zahl zwischen den Gruppen mit beinahe gar keinen Retweets und der Gruppe mit fast ausschließlich Retweets. Um die 100 Follower herum findet sich zusätzlich noch eine kleine Gruppe an Accounts mit 55-65% Retweet-Anteil.
-# Der Account, der mit ABstand die meisten Postings veröffentlicht hat, hat dies zu großen Teilen durch Retweets bewerkstelligt. Die nächstgrößeren Accounts mit 50.000+ Posts retweeten dagegen jedoch kaum bzw. zu großen Teilen quasi gar nicht. -> Nachrichtenseiten, die eigene Artikel teilen?
-user_rts %>% ggplot(aes(x = postcount, y = rtpercent, color = rtpercent)) + geom_point() + 
-  scale_x_continuous(name = "Posting-Anzahl", labels = scales::comma, trans = "log") +
-  labs(y = "Anteil Retweets", title = "Anteil Retweets an allen Postings eines Users",
-       subtitle = "Aufgeteilt nach Posting-Anzahl des Nutzers") +
-  theme_minimal()
-# Accounts mit mittel-vielen Postings scheinen mehr zu Retweeten als andere Accounts, auch wenn sich kein deutlicher Unterschied abzeichnet.
+# Der Account, der mit Abstand die meisten Postings veröffentlicht hat, hat dies zu großen Teilen durch Retweets bewerkstelligt. Die nächstgrößeren Accounts mit 50.000+ Posts retweeten dagegen jedoch kaum bzw. zu großen Teilen quasi gar nicht. -> Nachrichtenseiten, die eigene Artikel teilen?
+ids <- head(users_eng$userid[order(users_eng$follower_count, decreasing = T)], 10)
+tibble(names = sapply(ids, function(id){users_eng$user_screen_name[users_eng$userid == id]}, USE.NAMES = F), 
+       tweets = sapply(ids, function(id){user_rts$postcount[user_rts$userid == id]}, USE.NAMES = F), 
+       follower = head(users_eng$follower_count[order(users_eng$follower_count, decreasing = T)], 10))
+# Nein, hauptsächlich russisch-namige Accounts mit wenigen Tweets, und einige zumindest nicht offensichtlich russische Accounts mit vielen Tweets
+rm(df, rt, times, tweet_rts, user_rts, i, id, ids)
+
+
 
 
 # Cleanup Data Sets ----
 
-### Sprache: Da es hier um die Beeinflussung der USA gehen soll, sind nur englischsprachige Tweets von Interesse - Der Anteil von Amerikanern, die russisch, ukrainisch oder eine der anderen Sprachen beherrschen und auf zufällig aufauchende Tweets in diesen Sprachen reagiert sollte nicht ausreichen, um einen bedeutenden Einfluss zu entwickeln.
-tweets_eng <- tweets %>% filter(tweet_language %in% c("en"))
-rm(tweets)
-
 ### Entfernung nicht berücksichtigter Informationen
 
-# Retweets: Retweets sind zwar für eine Netzwerkanalyse ineressant, für die hier im folgenden angewendete Sprachprozessierung jedoch nicht wirklich hilfreich, da ein einzelner Tweet unter Umständen durch Retweets mehrere hundert Male im Datensatz vorkommen und so die Klassifizierung beeinflussen könnten.
+# Retweets: Retweets sind zwar für eine Netzwerkanalyse ineressant, für die hier im folgenden angewendete Sprachprozessierung jedoch nicht wirklich hilfreich, da ein einzelner Tweet unter Umständen durch Retweets mehrere hundert Male im Datensatz vorkommen und so die Klassifizierung beeinflussen könnte.
 tweets_eng <- tweets_eng %>% filter(is_retweet == FALSE)
-
-# Getaggte Nutzer: Viele der Tweets taggen andere Nutzer per @NUTERNAME. Da diese Information auch über die Variable "user_mentions" in den Daten vorhanden ist und die Nutzernamen unter Umständen die Textanalyse des Topic Models beeinflussen, werden sie zu Beginn entfernt. Auch Hashtag-Symbole können entfernt werden, da verwendete Hashtags separat in einer eigenen Variable getrackt werden.
-tweets_eng$tweet_text <- gsub("@[a-zA-Z0-9_]*", "", tweets_eng$tweet_text)
-tweets_eng$tweet_text <- gsub("#", "", tweets_eng$tweet_text)
-
-### Verwendete Medien: Viele der Nutzer verknüpfen ihre Posts mit Bild- oder Videomedien oder Links zu anderen Webinhalten. Diese werden innerhalb des Tweet-Textes als abgekürzter Link (https://t.co/...) dargestellt. Da diese Medien und externen Verlinkungen bei der hier durchgeführten Analyse nicht beachtet werden, können sie entfernt werden.
-tweets_eng$tweet_text <- gsub("https?://t.co/[a-zA-Z0-9]*", "", tweets_eng$tweet_text)
+# Eine Million Tweets weniger
 
 ### Entfernung unnötiger Klammern und leerer Einträge in bestimmten Spalten
 tweets_eng$hashtags <- str_replace_all(tweets_eng$hashtags, "\\[", "")
@@ -442,28 +434,48 @@ tweets_eng$user_mentions <- str_replace_all(tweets_eng$user_mentions, "\\[", "")
 tweets_eng$user_mentions <- str_replace_all(tweets_eng$user_mentions, "\\]", "")
 tweets_eng$user_mentions[tweets_eng$user_mentions==""] <- NA
 
+# Getaggte Nutzer: Viele der Tweets taggen andere Nutzer per @NUTERNAME. Da diese Information auch über die Variable "user_mentions" in den Daten vorhanden ist und die Nutzernamen unter Umständen die Textanalyse des Topic Models beeinflussen, werden sie zu Beginn entfernt. Auch Hashtag-Symbole können entfernt werden, da verwendete Hashtags separat in einer eigenen Variable getrackt werden.
+tweets_clean <- tweets_eng
+tweets_clean$tweet_text <- gsub("@[a-zA-Z0-9_]*", "", tweets_clean$tweet_text)
+tweets_clean$tweet_text <- gsub("#", "", tweets_clean$tweet_text)
+
+### Verwendete Medien: Viele der Nutzer verknüpfen ihre Posts mit Bild- oder Videomedien oder Links zu anderen Webinhalten. Diese werden innerhalb des Tweet-Textes als abgekürzter Link (https://t.co/...) dargestellt. Da diese Medien und externen Verlinkungen bei der hier durchgeführten Analyse nicht beachtet werden, können sie entfernt werden.
+tweets_clean$tweet_text <- gsub("https?://t.co/[a-zA-Z0-9]*", "", tweets_clean$tweet_text)
+
+
+
 ### Emoji
 # Viele der Tweets beinhalten Emoji. Diese können vom stm-Textprozessor nicht bearbeitet werden, da sie zwar technisch als Zahlen- und Buchstabenkombinationen angegeben werden, eine korrekte Verarbeitung jedoch nicht gewährleistet werden kann. Zusätzlich dazu ist es in vielen Tweets der Fall, dass Emoji untereinander bzw. Emoji und tatsächliche Worte nicht durch Leerstelen getrennt werden. Diese Tatsache führt dazu, dass der Gesamtverbund aus Emoji und Wort als Texteinheit etabliert wird und somit beispielsweise "☑️wort" und "wort" als grundverschiedene Einheiten erfasst werden. Das führt dazu, dass beispielsweise ein Topic-definierendes Wort ohne die Entfernung der Emoji "💥eraseobama���are���" war. Eine Umbenennung der Emoji in Text war demnach eindeutig vonnöten.
 #Um dies zu beheben wurde auf Basis der offiziellen Emoji-Liste des Unicode-Konsortiums (https://www.unicode.org/emoji/charts/full-emoji-list.html, aufgerufen und erstellt am 30.03.2020) ein Datensatz erstellt, der die Emojinummer, das entsprechende Browser-Emoji und den jeweiligen offiziellen Kurznamen sowie die Anzahl der für jedes Emoji verwendeten Symbole beinhaltet. Diese Kurznamen wurden als Grundlage für die Text-Ersetzungen genommen. Die Voranstellung von "emoj_" an jeden der Begriffe sorgt dabei dafür, dass jedes Emoji auch in Textform klar erkennbar bleibt. Die Entfernung jeglicher Leerstellen und Sonderzeichen sorgt dafür, dass jedes Emoji als ein einzelnes Wort behandelt wird.
 emoji <- read_csv2("Other Files/emoji-list.txt", col_names = T, col_types = cols(code = col_character(), Replace = col_character()), locale = locale(encoding = "UTF-8"))
 #Hinzufügen einer Leerstelle, um Emoji voneinander zu trennen, sollten mehrere direkt aufeinander folgen
-emoji$Replace <- paste(" ", emoji$Replace, " ")
-for (i in seq(1,length(emoji$Replace))){tweets_eng$tweet_text <- gsub(emoji$code[i], emoji$Replace[i], tweets_eng$tweet_text)}
-# ACHTUNG: Berechnete Laufzeit: Mehrere Stunden  (1809 Loop-Iterationen über 2 Mio. Strings mit variablen Längen)!
-tweets_eng$tweet_text <- gsub("  ", " ", tweets_eng$tweet_text)
-# Entfernung von möglichen mehrfachen Leerstellen, um eventuell möglichen Problemen zuvorzukommen.
+emoji$Replace <- paste(" ", emoji$Replace, " ") # um Platz zwischen Emoji und Rest zu lassen
+for(i in seq(1,length(emoji$Replace))){
+  tweets_clean$tweet_text <- gsub(emoji$code[i], emoji$Replace[i], tweets_clean$tweet_text)
+}# ACHTUNG: Berechnete Laufzeit: Mehrere Stunden  (1809 Loop-Iterationen über 2 Mio. Strings mit variablen Längen)!
+tweets_clean$tweet_text <- str_squish(tweets_clean$tweet_text)
+# Entfernung von möglichen mehrfachen Leerstellen, um eventuellen Problemen zuvorzukommen.
 rm(i, emoji)
 
-# write_csv(tweets_eng, file.path("Twitter Data/tweets_en-cleaned.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
-# DATEIEN LADEN: tweets_eng <- read_csv("Twitter Data/tweets_en-cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+# write_csv(tweets_eng, file.path("Twitter Data/tweets_en-norts.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+# write_csv(tweets_clean, file.path("Twitter Data/tweets_cleaned.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+# DATEIEN LADEN: 
+# tweets_eng <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+# tweets_clean <- read_csv("Twitter Data/tweets_cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 
 ### Das Problem der Duplikate ----
 ?duplicated
-duplicates <- tweets_eng[which(base::duplicated(tweets_eng$tweet_text)), ]
-duplicates$tweet_text[1:10]
-tweets_clean <- tweets_eng[which(!(duplicated(tweets_eng$tweet_text))), ]
+duplicates <- tweets_clean[which(duplicated(tweets_clean$tweet_text)), ]
+
+length(unique(duplicates$tweet_text))
+length(unique(duplicates$tweet_text)) / nrow(duplicates)
+unique(duplicates$tweet_text)[1:10]
+# Loop für Menge mehrfachen Auftretens bestimmter Tweets hier
+nodup <- which(!(duplicated(tweets_clean$tweet_text)))
+tweets_clean <- tweets_clean[nodup, ]
+tweets_eng <- tweets_eng[nodup, ]
 # Auch ohne Retweets schaffen es eine bedeutende Menge an Tweets, mehrfach in den Daten aufzuauchen, da sie wortgleich mehrfach gepostet wurden. Zwar lassen sich diese relativ simpel entfernen, aber es finden sich zweifellos auch wortähnliche Tweets bzw. Tweets, die sich nur durch das Erwähnen bestimmter Namen unterscheiden, und somit von dieser Filterung nicht erfasst werden würden. Zwar wäre es für die Einheitlichkeit der Daten am Besten, diese Duplikate alle zu belassen, da dann aber die einzelnen Topics sehr von Formulierungen dominiert und wenig aussagekräftig sein würden, wird dieser Filterung durchgeführt. Es muss einfach im Hinterkopf behalten werden, dass solche "unperfekten" Duplikate noch in den Daten vorhanden sein könnten.
-rm(tweets_eng)
+rm(nodup)
 
 
 # STM - Vorbereitung ----
@@ -473,20 +485,21 @@ toks <- quanteda::tokens(tweets_clean$tweet_text,
                          remove_separators = TRUE,
                          remove_punct = TRUE)
 
-toks <- tokens_remove(tokens_tolower(toks), c(stopwords("en"), "will", "can", "says", "get", "say", "go"))
+toks <- tokens_remove(tokens_tolower(toks), c(stopwords("en"), "get", "go", "say"))
 toks <- tokens_wordstem(toks)
 dtm <- dfm(toks)
 dtm <- dfm_trim(dtm, min_docfreq = 15)
-#dtm 
+#dtm
+topfeatures(dtm, n = 50)
 
-docvars(dtm, "date") <- tweets_clean$tweet_time
+docvars(dtm, "date") <- as.Date(tweets_clean$tweet_time)
 docvars(dtm, "quotecount") <- tweets_clean$quote_count
 docvars(dtm, "replycount") <- tweets_clean$reply_count
 docvars(dtm, "likecount") <- tweets_clean$like_count
 docvars(dtm, "retweetcount") <- tweets_clean$retweet_count
 
 stm_dtm <- convert(dtm, to = "stm")
-# Durch das Entfernen von Stopwords werden ca. 2.000 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt.
+# Durch das Entfernen von Stopwords und Nutzernamen werden ca. 2.300 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt.
 
 # save(stm_dtm, file = "Saved Files/stm_dtm.RData")
 # DATEN LADEN: load("Saved Files/stm_dtm.RData")
@@ -502,6 +515,7 @@ select_k <- searchK(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
                     K = seq(10, 110, by = 10),
                     prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
                     init.type = "Spectral", max.em.its = 10, seed = 2020)
+# ACHTUNG: EWIGE LAUFZEIT - mehrere Tage u.U., je nach Hardware - springt bei mir >16gb genutzter Arbeitsspeicher gen Ende (Anzahl an Topics + Anzahl an Tweets), es ist also fraglich, ob das in dieser Art auf Maschinen mit <= 16gb RAM überhaupt terminiert ...
 
 # save(select_k, file = "Saved Files/selectK.RData")
 # DATEN LADEN: load("Saved Files/selectK.RData")
@@ -515,13 +529,13 @@ for(i in 1:10){
   k_diff$Exklusivität[i] <- selectk_df$exclus[i+1] - selectk_df$exclus[i]
   k_diff$Kohärenz[i] <- selectk_df$semcoh[i+1] - selectk_df$semcoh[i]
   k_diff$Heldout[i] <- selectk_df$heldout[i+1] - selectk_df$heldout[i]
+  k_diff$LowerBound[i] <- selectk_df$lbound[i+1] - selectk_df$lbound[i]
 }
 
-k_diff %>% pivot_longer(-K, names_to = "measure", values_to = "value") %>%
+k_diff %>% select(-c("Iterationen")) %>% pivot_longer(-K, names_to = "measure", values_to = "value") %>%
   ggplot(aes(x = K, y = value, group = measure, color = measure)) +
-  geom_line() + facet_wrap(.~measure, scale = "free", ncol = 5) +
-  labs(y = "Veränderung zu K-10", title = "Interne Validität unterschiedlicher Topic-Anzahlen (K)", 
-       subtitle = "bei Tests mit max. 10 Iterationen") +
+  geom_line() + facet_wrap(.~measure, scale = "free", ncol = 2) +
+  labs(y = "Veränderung zu K-10") +
   theme_minimal() +
   theme(legend.position="none")
 # Residuen-Spike bei 100 Topics, lbound-Minimum bei 90 Topics, Iteraionen: Ab 70 Topics Konvergenz bei unter 10 Iterationen, Exklusivität: Plateau ab ca. 60 Topics mit lok. Minimum bei 80, Kohärenz-Beuge ab 70  Topics, Verbesserung der Heldout-Likelihood bei 80 Topics, Plateau bei 90/100 Topics -> 90 Topics erscheinen als beste Wahl
@@ -882,3 +896,14 @@ tweets_stm <- tweets_stm %>% mutate(max.topic = ifelse(max_prop >= 0.15, max.top
 tweets_stm %>% ggplot(aes(x = interactions)) + geom_histogram(bins = 70) + 
   scale_x_continuous(trans = "sqrt") + scale_y_continuous(trans = "sqrt")
 asd
+
+
+
+
+# Oh No Its Distances
+text <- tweets_eng$tweet_text
+start_time <- Sys.time()
+ohboyruntime <- stringdistmatrix(text, text)
+end_time <- Sys.time()
+
+end_time - start_time
