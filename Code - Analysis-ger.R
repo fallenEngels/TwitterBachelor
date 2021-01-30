@@ -37,11 +37,12 @@ rm(packages, pkg)
   library(stringr)
   library(reshape2)
   library(ggplot2)
+  library(gridExtra)
   library(lubridate)
   library(quanteda)
   library(stm)
   
-  setwd("Y:/Twitter Bachelor")
+  setwd("Y:/Twitter Bachelor") # Y: mit jeweiligem Stick-Ordner ersetzen
 }
 
 ### Der in dieser Datei präsentierte Code ist als konstant durchlaufendes Script gedacht - Vollständiges Markieren und Ausführen ist also möglich, wird aber aufgrund der voraussichtlichen Rechenzeit und der Dateigrößen nicht angeraten. Da einige der im Folgenden erzeugen Dateien aus aufwändigen und/oder rechenintensiven Schritten entstehen, besteht die Möglichkeit, diese komplexeren Elemente direkt zu laden. Aus diesem Grund werden sich an einzelnen Punkten in auskommentierter Form die Codes zum Speichern und Laden von Workspace-Dateien der jeweils erzeugten Daten finden.
@@ -53,7 +54,7 @@ rm(packages, pkg)
 
 # Verwendete Twitter-Datensätze ----
 
-users <- as.data.frame(read_csv("Twitter Data/ira_users_csv_hashed.csv")) 
+users <- as.data.frame(read_csv("Twitter Data/ira_users_csv_hashed.csv"))
 # Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
 tweets <- as.data.frame(read_csv("Twitter Data/ira_tweets_csv_hashed.csv", 
                                  col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(),
@@ -83,6 +84,7 @@ twt_lang <- data.frame(sort(table(tweets$tweet_language), decreasing = T))
 twt_lang$perc <- twt_lang$Freq / nrow(tweets) * 100
 twt_lang$perc <- format(twt_lang$perc, scientific = F, digits = 1)
 twt_lang
+tweets$tweet_text[tweets$tweet_language %in% c("ug", "ps", "iu")]
 # Obwohl die meisten Accounts englischsprachig eingestellt sind, sind dominant mehr Tweets in russischer Sprache verfasst, mit englischen Tweets auf Platz 2 - Tweeten englisch eingestellte Accounts auf russisch oder tweeten russisch eingestellte Accounts mehr als englische?
 table(tweets$account_language == tweets$tweet_language) / nrow(tweets) * 100
 # In 72,6% der Fälle stimmt die Tweet-Sprache mit der gewählten Account-Sprache überein. Russischsprachige Accounts scheinen also einfach mehr getweetet zu haben als englischsprachige
@@ -106,10 +108,11 @@ lang_excl.long <- lang_excl %>% select(userid, eng_perc, rus_perc, oth_perc) %>%
 lang_excl.long <- melt(lang_excl.long, id.vars = "userid")
 
 lang_excl.long %>% ggplot(aes(x = variable, y = value, fill = variable)) + geom_violin() + theme_minimal() +
-  labs(x = "Sprache", y = "Anteil an Tweets je Account in %") + 
+  labs(x = "Sprache", y = "Anteil an Tweets je Account in %") + theme(legend.position="none") +
+  scale_x_discrete(labels=c("Englisch", "Russisch", "Andere")) +
   scale_fill_discrete(name = "Sprache", labels = c("Englisch", "Russisch", "Andere"))
 # Sprachauswahl scheint dominant Accounts zu bestimmen, kaum Accounts unter ~80% einer Sprache -> gute Filtermöglichkeit, Dominanz anderer Sprachen on ~5-10% je Account lässt strukturelles Mislabeling bestimmter (zu kurzer?) Tweets vermuten
-rm(lang_excl, lang_excl.long)
+rm(lang_excl.long)
 # "Falsche" Sprachen genauer analysiert
 table(tweets$account_language != tweets$tweet_language)[2] # 2,1 Mio "falsch" gelabelte Tweets
 data.frame(sort(table(tweets$account_language[tweets$account_language != tweets$tweet_language]), decreasing = T))[1:5,]
@@ -123,7 +126,17 @@ rm(twt_lang, acc_lang)
 tweets_eng <- tweets %>% filter(tweet_language == "en")
 users_eng <- users %>% filter(userid %in% tweets_eng$userid)
 # Deutlicher Nachlass in Tweets, 8,5 Mio -> 3 Mio (1/3), kaum Nachlass in Accounts mit mind. 1 englischsprachigen Tweet, 3608 -> 3077
-rm(tweets, users)
+tweets_eng1 <- tweets %>% filter(tweet_language == "en" & userid %in% lang_excl$userid[lang_excl$eng_perc >= 50])
+users_eng1 <- users %>% filter(userid %in% tweets_eng1$userid)
+# Deutlicher NAchlass in Accounts, kaum Nachlass in Tweets -> wenig genutzte "bilinguale" Accounts
+diff <- tweets_eng[!(tweets_eng$tweetid %in% tweets_eng1$tweetid), ] %>% 
+  select(userid, account_creation_date, tweet_time) %>% mutate(tweet_time = as.Date(diff$tweet_time))
+diff.long <- melt(diff, id.vars = "userid")
+diff.long %>% ggplot(aes(x = value, fill = variable)) + theme_minimal() +
+  geom_histogram(bins = 100, position = "dodge") + labs(x = "Datum", y = "Anzahl") +
+  scale_fill_discrete(name = "", labels = c("Account-\nErstelldatum", "Posting-Datum")) +
+  theme(legend.position = "top")
+rm(tweets, users, tweets_eng1, users_eng1, lang_excl, diff, diff.long)
 
 
 
@@ -231,6 +244,7 @@ table(is.na(users_eng$shortened_location) == is.na(users_eng$user_reported_locat
 
 table(users_eng$shortened_location)
 
+length(grep("US", users_eng$shortened_location)); length(grep("Russia", users_eng$shortened_location))
 length(grep("US,", users_eng$shortened_location))
 length(grep("US,", users_eng$shortened_location)) / length(grep("US", users_eng$shortened_location)) *100
 sort(table(users_eng$shortened_location[grep("US,", users_eng$shortened_location)]), decreasing = T)
@@ -241,6 +255,8 @@ sort(table(users_eng$shortened_location[grep("Russia", users_eng$shortened_locat
 
 
 ### Account-Erstelldaten
+min(tweets_eng$account_creation_date); max(tweets_eng$account_creation_date)
+# Beinahe 9 Jahre an Accounts und Tweets finden sich in den Daten
 quartals <- c(as.Date("2009-01-01"), as.Date("2009-04-01"), as.Date("2009-07-01"), as.Date("2009-10-01"))
 for(i in 10:18){
   year <- as.character(2000 + i)
@@ -256,15 +272,14 @@ ggplot(users_eng, aes(x = account_creation_date, fill = account_language)) + geo
                                                  "#4D9E22", "#AE8046", "#619CFF", "#4A3FC6", "#00BA38"),
                     labels = c("Arabisch", "Deutsch", "Englisch", "Englisch (GB)", "Spanisch", "Französisch",
                                "Indonesisch", "Italienisch", "Russisch", "Ukrainisch", "Chinesisch")) +
-  labs(x = "Quartal", y = "Anzahl Accounts", title = "Erstelldatum aller Accounts, gruppiert nach Quartal und Account-Sprache") + theme_minimal()
+  labs(x = "Quartal", y = "Anzahl Accounts") + theme_minimal()
 # Der Großteil der Accounts wurde im Zeitraum 2. Häfte 2013 - 1. Häfte 2014 erstellt - lange vor dem US-Wahlkampf 2016, und sowohl für englische als auch für russische Accounts. Mögliche Erklärungen: Zeitnutzung, um Accounts als "seriös" zu etablieren, oder Nutzung der Accounts zur Beeinflussung anderer Themen als der Wahl.
 table(users_eng$account_creation_date < "2013-06-01")
 table(users_eng$account_creation_date > "2014-06-01")
 (1 - (98 + 1103) / nrow(users_eng)) *100
 # 98 Accounts wurden vor und 1103 nach dieser Spitze erstellt, 1876 bzw. 61% in dieser Spitze.
 min(users_eng$account_creation_date); max(users_eng$account_creation_date)
-min(tweets_eng$tweet_time); max(tweets_eng$tweet_time)
-# Beinahe 10 Jahre an Accounts und Tweets finden sich in den Daten
+
 rm(quartals)
 
 
@@ -279,17 +294,18 @@ for(i in 1:nrow(users_eng)){
   }
 } # This might take a while
 names(activity) <- c("userid", "creation", "tweets", "first.post", "last.post")
-rm(twe)
-activity <- activity %>% mutate(sleep = as.integer(first.post - creation), active = as.integer(last.post-first.post + 1))
+rm(twe, i)
+activity <- activity %>% mutate(sleep = as.integer(first.post - creation), 
+                                active = as.integer(last.post-first.post + 1))
 summary(activity$sleep)
 summary(activity$active)
 ggplot(activity, aes(x = active)) + geom_histogram(bins = 75) + 
   scale_x_continuous(trans = "sqrt", breaks = c(10, 100, 250,500, 1000, 1500, 2000, 2500, 3000)) +
-  labs(x = "Tage an Aktivität des Accounts", y = "Anzahl") + theme_min
+  labs(x = "Tage an Aktivität des Accounts", y = "Anzahl") + theme_minimal()
 # Dominante Menge an Accounts sind nur ein, zwei Tage aktiv. Nur minimaler Anteil an Accounts sind über 1.000 Tage aktiv
 ggplot(activity, aes(x = sleep)) + geom_histogram(bins = 75) +
   scale_x_continuous(trans = "sqrt", breaks = c(10, 100, 250,500, 1000, 1500, 2000, 2500, 3000)) +
-  labs(x = "Tage seit Account-Erstellung bis zu erstem Post", y = "Anzahl")
+  labs(x = "Tage seit Account-Erstellung bis zu erstem Post", y = "Anzahl") + theme_minimal()
 # Deutlich weniger Klarheit in Inaktivität vor erstem Post. Viele Accounts sind sofort aktiv, aber es gibt Gruppen mit lokalen Maxima um 250, 500 und 800 Tage Inaktivität
 
 
@@ -305,7 +321,7 @@ as.Date_origin <- function(x){as.Date(x, origin = '1970-01-01')}
 ggplot(activity, aes(x = active, y = sleep, color = creation)) + geom_point() + theme_minimal() +
   scale_x_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 2000, 3000)) + 
   scale_y_continuous(trans = "sqrt", breaks = c(10, 75, 200, 500, 1000, 1500, 2000)) + 
-  scale_colour_gradientn(colours=c('red','green','blue'), labels=as.Date_origin, name = "Erstelldatum", n.breaks = 6) +
+  scale_colour_gradientn(colours=rainbow(9), labels=as.Date_origin, name = "Erstelldatum", n.breaks = 6) +
   labs(x = "Tage an Aktivität des Accounts", y = "Tage seit Account-Erstellung bis zu erstem Post")
 # Über lange Zeiträume genutzte Accounts wurden meist direkt nach Ertstellung aktiv, während Accounts, die nur wenige Tage benutzt wurden eher lange auf diese kurze Aktivität "warteten" Zudem lässt sich ein beinahe viereckiger Kasten aus Accounts bis 1000 Tage Aktivität und bis 600 Tage vor erstem Post erkennen. Diese Beobachtung ist insbesondere einer Gruppe an Acocunts, die um die 500 Tage nach Erstellung aktiv wurden und in Aktivität sowie Anzahl abgesetzter Tweets stark schwanken, zu verdanken.
 # Zusätzlich lässt sich erkennen, dass Accounts mit längerer Aktivitätszeit auch im Schnitt mehr Tweets absetzen, was von einer konstanten Aktivität ausgehen lässt.
@@ -335,27 +351,45 @@ for(i in 1:length(lm_seq)){
   lm_df$adr_no[i] <- lm$adj.r.squared
 }
 rm(followbots, nobots, i, lm_seq, lm)
-lm_df %>% ggplot(aes(x = n)) + geom_line(aes(y = adr_follow, color = "Follows > N")) + 
+lm_df %>% ggplot(aes(x = n)) + geom_line(aes(y = adr_follow, color = "Follows >= N")) + 
   geom_line(aes(y = adr_no, color = "Follows < N")) +
-  labs(x = "Zahl eigener Follows", y = "adj. R^2", color = "")
+  labs(x = "Zahl eigener Follows (N)", y = "adj. R^2", color = "") + theme_minimal()
 lm_df$n[which(lm_df$adr_follow == max(lm_df$adr_follow))]
 # Ab 2.800 eigenen Follows ist davon auszugehen, dass Accounts followbots nutzen, da an diesem Punkt die Varianzaufklärung maximiert ist. Der relativ lineare Abfall für N > 2800 lässt sich vermutlich dadurch erklären, dass tatsächliche Followbot-Nutzer in die Gruppe der Nicht-Nutzer einsortiert werden.
 followbots <- users_eng[which(users_eng$following_count >= 2800), ]
-followbots <- followbots[, 7:8]
+followbots <- followbots[, c(1, 7:9)]
 nobots <- users_eng[which(users_eng$following_count < 2800), ]
-nobots <- nobots[, 7:8]
+nobots <- nobots[, c(1, 7:9)]
 summary(lm(followbots$follower_count ~ followbots$following_count))
 summary(lm(nobots$follower_count ~ nobots$following_count))
 # Für die Accounts, die über 2.800 anderen Accounts folgen, besteht ein deutlicher Zusammenhang zwischen der Anzahl gefolgter Accounts und der Anzahl eigener Follower. Während für die 2.895 Accounts unter 2.800 Follows die Anzahl gefolgter Accounts nur knapp über 1% der Varianz in den eigenen Follower-Zahlen erklärt (adj. R^2 = 0,011), ist es für die Accounts mit über 2.800 Follows eine Varianzaufklärung von über 70% (adj. R^2 = 0,71)! Zusätzlich ist für beide Account-Gruppen ersichtlich, dass sie ab mehreren hundert Followern im Schnitt mehr Follower haben, als sie selbst followen, da in beiden Fällen für jeden Follow 1,5 bzw. 1,6 eigene Follower hinzukommen.
+summary(users_eng$follower_count)
+sum(users_eng$follower_count < 10)
+sum(users_eng$follower_count < 100)
+table(follow_df$bots[follow_df$followers >= 1000])
+table(follow_df$bots[follow_df$followers >= 1933])
+
 rm(followbots, nobots, lm_df)
 
 
 ### Tweet-Zeiten
 times <- tibble(dt = tweets_eng$tweet_time %>% ymd_hms()) %>%
-  mutate(timepart = hms::hms(as.numeric(dt - floor_date(dt, "1 day"), unit="secs")), timeset = as.integer(substr(timepart,1,2)))
+  mutate(timepart = hms::hms(as.numeric(times$dt - floor_date(times$dt, "1 day"), unit="secs")), 
+         timeset = as.integer(substr(timepart,1,2))) %>%
+  mutate(timeset_ru = timeset + 3) %>% mutate(timeset_ru = ifelse(timeset_ru >23, timeset_ru - 24, timeset_ru))
 # Will definitely take time
-ggplot(times, aes(x = timeset)) + geom_bar() + theme_minimal() + 
-  labs(title = "Tweets nach UTC-Zeit, alle Tweets", x = "Uhrzeit (Stunden)", y = "Anzahl Tweets")
+times_plot <- data.frame(time_ru = sort(unique(times$timeset_ru)), tweetnum = 0)
+for(i in 1:24){
+  df <- times %>% filter(timeset_ru == times_plot$time_ru[i])
+  times_plot$tweetnum[i] <- nrow(df)
+}
+
+
+ggplot(times_plot, aes(x = time_ru, y = (tweetnum-median(tweetnum)))) + 
+  geom_col(fill = "#4A3FC6") + theme_minimal() + 
+  labs(x = "Uhrzeit Moskau (MSK, in Stunden)", y = "Anzahl Tweets\nnormalisiert mit Median über alle Uhrzeiten")
+
+# Manuelle Einfügung der Uhrzeiten in anderem Grafikprogramm
 
 #Es gibt deutlich erkennbare Muster in den Tweetzeiten. So werden eine große Menge Tweets zwischen 12:00 und 19:00 UTC abgesetzt, während zwischen 4:00 und 08:00 UTC bedeutend weniger Tweets verfasst wurden.
 
