@@ -136,6 +136,7 @@ diff.long %>% ggplot(aes(x = value, fill = variable)) + theme_minimal() +
   geom_histogram(bins = 100, position = "dodge") + labs(x = "Datum", y = "Anzahl") +
   scale_fill_discrete(name = "", labels = c("Account-\nErstelldatum", "Posting-Datum")) +
   theme(legend.position = "top")
+
 rm(tweets, users, tweets_eng1, users_eng1, lang_excl, diff, diff.long)
 
 
@@ -375,8 +376,8 @@ rm(followbots, nobots, lm_df)
 ### Tweet-Zeiten
 times <- tibble(dt = tweets_eng$tweet_time %>% ymd_hms()) %>%
   mutate(timepart = hms::hms(as.numeric(times$dt - floor_date(times$dt, "1 day"), unit="secs")), 
-         timeset = as.integer(substr(timepart,1,2))) %>%
-  mutate(timeset_ru = timeset + 3) %>% mutate(timeset_ru = ifelse(timeset_ru >23, timeset_ru - 24, timeset_ru))
+         timeset = as.integer(substr(timepart,1,2))) %>%  mutate(timeset_ru = timeset + 3) %>% 
+  mutate(timeset_ru = ifelse(timeset_ru >23, timeset_ru - 24, timeset_ru))
 # Will definitely take time
 times_plot <- data.frame(time_ru = sort(unique(times$timeset_ru)), tweetnum = 0)
 for(i in 1:24){
@@ -384,24 +385,17 @@ for(i in 1:24){
   times_plot$tweetnum[i] <- nrow(df)
 }
 
-
 ggplot(times_plot, aes(x = time_ru, y = (tweetnum-median(tweetnum)))) + 
   geom_col(fill = "#4A3FC6") + theme_minimal() + 
-  labs(x = "Uhrzeit Moskau (MSK, in Stunden)", y = "Anzahl Tweets\nnormalisiert mit Median über alle Uhrzeiten")
-
+  labs(x = "Uhrzeit Westrussland (MSK, in Stunden)", y = "Anzahl Tweets (Median-Normalisiert)")
 # Manuelle Einfügung der Uhrzeiten in anderem Grafikprogramm
-
-#Es gibt deutlich erkennbare Muster in den Tweetzeiten. So werden eine große Menge Tweets zwischen 12:00 und 19:00 UTC abgesetzt, während zwischen 4:00 und 08:00 UTC bedeutend weniger Tweets verfasst wurden.
-
-#Das bedeutet, dass die Großzahl der Tweets nach amerikanischer Sicht zwischen 03:00 und 13:00 (Ostküste) bzw. 00:00 und 10:00 (Westküste) verfasst wurden. Geht man von russischen Verfassern aus, so liegt die Hochfrequenz zwischen 10:00 und 20:00 (Moskau/St. Petersburg). Es gibt also entweder Hochzeiten während der Morgensunden in Amerika oder während den Arbeitsstunden in West-Russland.
-
-
+rm(times, times_plot)
 
 
 ### Tweets vs. Retweets
+table(tweets_eng$is_retweet)
 
-#Zwei Graphen: Tweets/Retweets vs. Followerzahl, Tweets/Retweets vs. Tweetzahl
-tweet_rts <- tweets_eng %>% select(userid, is_retweet)
+tweet_rts <- tweets_eng %>% select(userid, is_retweet, retweet_userid)
 user_rts <- users_eng %>% select(userid, follower_count)
 
 for(i in 1:nrow(users_eng)){
@@ -415,34 +409,41 @@ user_rts[, 5] <- user_rts[, 4] / user_rts[, 3]
 names(user_rts) <- c("userid", "followers", "postcount", "retweets", "rtpercent")
 
 # Anteil Retweets an allen Postings eines Users
-user_rts %>% ggplot(aes(x = rtpercent)) + geom_histogram(bins = 100) + 
-  labs(x = "Anteil Retweets") +
+user_rts %>% ggplot(aes(x = rtpercent, y = ..density..)) + geom_histogram(bins = 100, fill = "#4A3FC6") +
+  geom_density(color = "red", size = 1) + labs(x = "Anteil Retweets", y = "Dichte (density)") +
   theme_minimal() + scale_y_continuous(trans = "sqrt")
-#Die große Mehrheit der Accounts setzt auf eigene Postings und wenige bis gar keine Retweets, während einige Accounts nur aus Retweets zu bestehen scheinen. Auffällig sind auch einzelne Spikes und eine Ansammlung an Accounts um die 85-95% Retweet-Rate.
+#Die große Mehrheit der Accounts setzt entweder auf eigene Postings und wenige bis gar keine Retweets oder quasi nur auf Retweets. Auffällig sind auch einzelne Spikes und eine Ansammlung an Accounts um die 85-95% Retweet-Rate.
 
-# Anteil Retweets an allen Postings eines Users
+# Anteil Retweets an allen Postings eines Users - nach Followern
 user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = postcount)) + geom_point() +
-  scale_color_gradient(trans = "sqrt", low = "dark red", high = "green", 
-                       breaks = c(2500, 10000, 25000, 50000, 100000)) +
+  scale_colour_gradientn(trans = "sqrt", colours=rainbow(9), name = "Anzahl\nPostings", 
+                         breaks = c(2000, 10000, 25000, 50000, 100000), labels = scales::comma) +
   scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "sqrt", 
                      breaks = c(1000, 10000, 25000, 50000, 100000, 200000)) +
-  labs(y = "Anteil Retweets", color = "Anzahl\nTweets")
+  geom_smooth (alpha=0.15, size=0, span=0.5) +
+  stat_smooth (geom="line", alpha=0.5, size=1, span=0.5) +
+  labs(y = "Anteil Retweets") + theme_minimal()
 # Accounts mit vielen Followern (fünfstellig und aufwärts) setzen hauptsächlich auf eigene Tweets und retweeten wenig. Mit zunehmender Follower-Zahl gent die Anzahl an Retweets weiter zurück.
 user_rts %>% ggplot(aes(x = followers, y = rtpercent, color = postcount)) + geom_point() +
-  scale_color_gradient(trans = "sqrt", low = "dark red", high = "green", 
-                       breaks = c(2500, 10000, 25000, 50000, 100000, 100000)) +
+  scale_colour_gradientn(trans = "sqrt", colours=rainbow(9), name = "Anzahl\nPostings", 
+                         breaks = c(2000, 10000, 25000, 50000, 100000), labels = scales::comma) +
   scale_x_continuous(name = "Follower-Zahl", labels = scales::comma, trans = "log", 
                      breaks = c(1, 10, 100, 1000, 10000, 100000)) +
-  labs(y = "Anteil Retweets", color = "Anzahl\nTweets")
+  geom_smooth (alpha=0.15, size=0, span=0.5) +
+  stat_smooth (geom="line", alpha=0.5, size=1, span=0.5) +
+  labs(y = "Anteil Retweets") +theme_minimal()
 # Es zeigt sich ein leichter Unterschied in der Follower-Zahl zwischen den Gruppen mit beinahe gar keinen Retweets und der Gruppe mit fast ausschließlich Retweets. Während sich im Bereich 10-100 eine Gruppe an Accounts mit nahe 0 Retweets findet, existiert eine ähnliche Gruppe mit >90% Retweets im Bereich um die 1.000 Follower.
 
-# Der Account, der mit Abstand die meisten Postings veröffentlicht hat, hat dies zu großen Teilen durch Retweets bewerkstelligt. Die nächstgrößeren Accounts mit 50.000+ Posts retweeten dagegen jedoch kaum bzw. zu großen Teilen quasi gar nicht. -> Nachrichtenseiten, die eigene Artikel teilen?
-ids <- head(users_eng$userid[order(users_eng$follower_count, decreasing = T)], 10)
+# Erkenntnis 1:Retweet-Accounts scheinen im Schnitt "beliebter" gewesen zu sein als Accounts mit eigenen Postings. Aber was retweeten diese Accounts? Sind es Tweets anderer IRA-Accounts, oder sind es Tweets "echter" Akteure?
+table(tweet_rts$retweet_userid[tweet_rts$is_retweet == T] %in% users_eng$userid)
+
+# Erkenntnis 2: Der Account, der mit Abstand die meisten Postings veröffentlicht hat, hat dies zu großen Teilen durch Retweets bewerkstelligt. Die nächstgrößeren Accounts mit 50.000+ Posts retweeten dagegen jedoch kaum bzw. zu großen Teilen quasi gar nicht. -> Nachrichtenseiten, die eigene Artikel teilen?
+ids <- head(users_eng$userid[order(users_eng$follower_count, decreasing = T)], 20)
 tibble(names = sapply(ids, function(id){users_eng$user_screen_name[users_eng$userid == id]}, USE.NAMES = F), 
        tweets = sapply(ids, function(id){user_rts$postcount[user_rts$userid == id]}, USE.NAMES = F), 
-       follower = head(users_eng$follower_count[order(users_eng$follower_count, decreasing = T)], 10))
+       follower = head(users_eng$follower_count[order(users_eng$follower_count, decreasing = T)], 20))
 # Nein, hauptsächlich russisch-namige Accounts mit wenigen Tweets, und einige zumindest nicht offensichtlich russische Accounts mit vielen Tweets
-rm(df, rt, times, tweet_rts, user_rts, i, id, ids)
+rm(df, rt, tweet_rts, user_rts, i, id, ids)
 
 
 
