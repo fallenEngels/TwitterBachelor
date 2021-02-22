@@ -136,6 +136,7 @@ diff.long %>% ggplot(aes(x = value, fill = variable)) + theme_minimal() +
   geom_histogram(bins = 100, position = "dodge") + labs(x = "Datum", y = "Anzahl") +
   scale_fill_discrete(name = "", labels = c("Account-\nErstelldatum", "Posting-Datum")) +
   theme(legend.position = "top")
+# ABER: Strukturelles Posting der "gering"-Accounts könnte inhaltlich relevant sein. Auf Verdacht also in den Daten lassen.
 
 rm(tweets, users, tweets_eng1, users_eng1, lang_excl, diff, diff.long)
 
@@ -447,7 +448,6 @@ rm(df, rt, tweet_rts, user_rts, i, id, ids)
 
 
 
-
 # Cleanup Data Sets ----
 
 ### Entfernung nicht berücksichtigter Informationen
@@ -484,33 +484,37 @@ tweets_clean$tweet_text <- gsub("https?://t.co/[a-zA-Z0-9]*", "", tweets_clean$t
 #Um dies zu beheben wurde auf Basis der offiziellen Emoji-Liste des Unicode-Konsortiums (https://www.unicode.org/emoji/charts/full-emoji-list.html, aufgerufen und erstellt am 30.03.2020) ein Datensatz erstellt, der die Emojinummer, das entsprechende Browser-Emoji und den jeweiligen offiziellen Kurznamen sowie die Anzahl der für jedes Emoji verwendeten Symbole beinhaltet. Diese Kurznamen wurden als Grundlage für die Text-Ersetzungen genommen. Die Voranstellung von "emoj_" an jeden der Begriffe sorgt dabei dafür, dass jedes Emoji auch in Textform klar erkennbar bleibt. Die Entfernung jeglicher Leerstellen und Sonderzeichen sorgt dafür, dass jedes Emoji als ein einzelnes Wort behandelt wird.
 emoji <- read_csv2("Other Files/emoji-list.txt", col_names = T, col_types = cols(code = col_character(), Replace = col_character()), locale = locale(encoding = "UTF-8"))
 #Hinzufügen einer Leerstelle, um Emoji voneinander zu trennen, sollten mehrere direkt aufeinander folgen
-emoji$Replace <- paste(" ", emoji$Replace, " ") # um Platz zwischen Emoji und Rest zu lassen
+emoji$Replace <- paste(" ", emoji$Replace, " ")
 for(i in seq(1,length(emoji$Replace))){
   tweets_clean$tweet_text <- gsub(emoji$code[i], emoji$Replace[i], tweets_clean$tweet_text)
-}# ACHTUNG: Berechnete Laufzeit: Mehrere Stunden  (1809 Loop-Iterationen über 2 Mio. Strings mit variablen Längen)!
+}# ACHTUNG: Berechnete Laufzeit: Mehrere Stunden  (1809 Loop-Iterationen über ~2 Mio. Strings mit variablen Längen)!
 tweets_clean$tweet_text <- str_squish(tweets_clean$tweet_text)
 # Entfernung von möglichen mehrfachen Leerstellen, um eventuellen Problemen zuvorzukommen.
 rm(i, emoji)
 
+
+
+### Das Problem der Duplikate ----
+?duplicated # "smallest index" wird selbst nicht als Duplikat gezählt!
+duplicates <- tweets_clean[duplicated(tweets_clean$tweet_text) | duplicated(tweets_clean$tweet_text, fromLast=TRUE), ]
+
+length(unique(duplicates$tweet_text))
+length(unique(duplicates$userid))
+unique(duplicates$tweet_text)[1:10]
+tweets_clean$is_dupe <- ifelse(tweets_clean$tweetid %in% duplicates$tweetid, T, F)
+tweets_eng$is_dupe <- ifelse(tweets_eng$tweetid %in% duplicates$tweetid, T, F)
+table(tweets_clean$is_dupe)
+# Auch ohne Retweets schaffen es eine bedeutende Menge an Tweets, mehrfach in den Daten aufzuauchen, da sie wortgleich mehrfach gepostet wurden. Zwar lassen sich diese relativ simpel entfernen, aber es finden sich zweifellos auch wortähnliche Tweets bzw. Tweets, die sich nur durch das Erwähnen bestimmter Namen unterscheiden, und somit von dieser Filterung nicht erfasst werden würden. Somit ist es für die Einheitlichkeit der Daten am Besten, diese Duplikate alle zu belassen, und zu hoffen, dass die einzelnen Topics nicht zu sehr von Formulierungen dominiert und wenig aussagekräftig werden.
+rm(duplicates)
+
 # write_csv(tweets_eng, file.path("Twitter Data/tweets_en-norts.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
 # write_csv(tweets_clean, file.path("Twitter Data/tweets_cleaned.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+
 # DATEIEN LADEN: 
 # tweets_eng <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 # tweets_clean <- read_csv("Twitter Data/tweets_cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 
-### Das Problem der Duplikate ----
-?duplicated
-duplicates <- tweets_clean[which(duplicated(tweets_clean$tweet_text)), ]
 
-length(unique(duplicates$tweet_text))
-length(unique(duplicates$tweet_text)) / nrow(duplicates)
-unique(duplicates$tweet_text)[1:10]
-# Loop für Menge mehrfachen Auftretens bestimmter Tweets hier
-nodup <- which(!(duplicated(tweets_clean$tweet_text)))
-tweets_clean <- tweets_clean[nodup, ]
-tweets_eng <- tweets_eng[nodup, ]
-# Auch ohne Retweets schaffen es eine bedeutende Menge an Tweets, mehrfach in den Daten aufzuauchen, da sie wortgleich mehrfach gepostet wurden. Zwar lassen sich diese relativ simpel entfernen, aber es finden sich zweifellos auch wortähnliche Tweets bzw. Tweets, die sich nur durch das Erwähnen bestimmter Namen unterscheiden, und somit von dieser Filterung nicht erfasst werden würden. Zwar wäre es für die Einheitlichkeit der Daten am Besten, diese Duplikate alle zu belassen, da dann aber die einzelnen Topics sehr von Formulierungen dominiert und wenig aussagekräftig sein würden, wird dieser Filterung durchgeführt. Es muss einfach im Hinterkopf behalten werden, dass solche "unperfekten" Duplikate noch in den Daten vorhanden sein könnten.
-rm(nodup)
 
 
 # STM - Vorbereitung ----
@@ -547,20 +551,20 @@ rm(dtm, toks)
 # STM - Suche nach K ----
 
 select_k <- searchK(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
-                    K = seq(10, 110, by = 10),
+                    K = seq(10, 150, by = 10),
                     prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
-                    init.type = "Spectral", max.em.its = 10, seed = 2020)
-# ACHTUNG: EWIGE LAUFZEIT - mehrere Tage u.U., je nach Hardware - springt bei mir >16gb genutzter Arbeitsspeicher gen Ende (Anzahl an Topics + Anzahl an Tweets), es ist also fraglich, ob das in dieser Art auf Maschinen mit <= 16gb RAM überhaupt terminiert ...
+                    init.type = "Spectral", max.em.its = 10, seed = 2021)
+# ACHTUNG: EWIGE LAUFZEIT - mehrere Tage u.U., je nach Hardware - springt bei mir >16gb genutzter Arbeitsspeicher (Anzahl an Topics + Anzahl an Tweets), es ist also fraglich, ob das in dieser Art auf Maschinen mit <= 16gb RAM überhaupt läuft ...
 
-# save(select_k, file = "Saved Files/selectK.RData")
-# DATEN LADEN: load("Saved Files/selectK.RData")
+# save(select_k, file = "Saved Files/selectK_150.RData")
+# DATEN LADEN: load("Saved Files/selectK_150.RData")
 plot(select_k)
 selectk_df <- data.frame(K = unlist(select_k$results$K), exclus = unlist(select_k$results$exclus),
                          semcoh = unlist(select_k$results$semcoh), heldout = unlist(select_k$results$heldout),
                          residual = unlist(select_k$results$residual), bound = unlist(select_k$results$bound),
                          lbound = unlist(select_k$results$lbound), em.its = unlist(select_k$results$em.its))
-k_diff <- data.frame(K = selectk_df$K[2:11], Iterationen = selectk_df$em.its[2:11])
-for(i in 1:10){
+k_diff <- data.frame(K = selectk_df$K[2:15], Iterationen = selectk_df$em.its[2:15])
+for(i in 1:14){
   k_diff$Exklusivität[i] <- selectk_df$exclus[i+1] - selectk_df$exclus[i]
   k_diff$Kohärenz[i] <- selectk_df$semcoh[i+1] - selectk_df$semcoh[i]
   k_diff$Heldout[i] <- selectk_df$heldout[i+1] - selectk_df$heldout[i]
@@ -568,12 +572,12 @@ for(i in 1:10){
 }
 
 k_diff %>% select(-c("Iterationen")) %>% pivot_longer(-K, names_to = "measure", values_to = "value") %>%
-  ggplot(aes(x = K, y = value, group = measure, color = measure)) +
+  ggplot(aes(x = K, y = value, group = measure, color = measure)) + geom_hline(yintercept = 0) +
   geom_line() + facet_wrap(.~measure, scale = "free", ncol = 2) +
-  labs(y = "Veränderung zu K-10") +
+  labs(y = "Veränderung zu K-10") + scale_x_continuous(breaks = seq(20, 150, 10)) +
   theme_minimal() +
   theme(legend.position="none")
-# Residuen-Spike bei 100 Topics, lbound-Minimum bei 90 Topics, Iteraionen: Ab 70 Topics Konvergenz bei unter 10 Iterationen, Exklusivität: Plateau ab ca. 60 Topics mit lok. Minimum bei 80, Kohärenz-Beuge ab 70  Topics, Verbesserung der Heldout-Likelihood bei 80 Topics, Plateau bei 90/100 Topics -> 90 Topics erscheinen als beste Wahl
+# Lowerbound und Heldout-Wahrscheinlichkeit relativ stabil zwischen 40 und 120 Topics mit je deutlichen Einbußen bei 130 Topics, kaum Exklusivitätsgewinn ab 90 Topics und Gewinn an Kohärenz bei 110 Topics -> 110 Topics als beste Wahl.
 rm(k_diff, select_k, selectk_df)
 
 # STM - Interpretation ----
