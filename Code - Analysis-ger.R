@@ -491,6 +491,8 @@ for(i in seq(1,length(emoji$Replace))){
 tweets_clean$tweet_text <- str_squish(tweets_clean$tweet_text)
 # Entfernung von möglichen mehrfachen Leerstellen, um eventuellen Problemen zuvorzukommen.
 rm(i, emoji)
+# write_csv(tweets_eng, file.path("Twitter Data/tweets_en-norts.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+# write_csv(tweets_clean, file.path("Twitter Data/tweets_cleaned.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
 
 
 
@@ -498,21 +500,30 @@ rm(i, emoji)
 ?duplicated # "smallest index" wird selbst nicht als Duplikat gezählt!
 duplicates <- tweets_clean[duplicated(tweets_clean$tweet_text) | duplicated(tweets_clean$tweet_text, fromLast=TRUE), ]
 
-length(unique(duplicates$tweet_text))
-length(unique(duplicates$userid))
-unique(duplicates$tweet_text)[1:10]
-tweets_clean$is_dupe <- ifelse(tweets_clean$tweetid %in% duplicates$tweetid, T, F)
-tweets_eng$is_dupe <- ifelse(tweets_eng$tweetid %in% duplicates$tweetid, T, F)
-table(tweets_clean$is_dupe)
-# Auch ohne Retweets schaffen es eine bedeutende Menge an Tweets, mehrfach in den Daten aufzuauchen, da sie wortgleich mehrfach gepostet wurden. Zwar lassen sich diese relativ simpel entfernen, aber es finden sich zweifellos auch wortähnliche Tweets bzw. Tweets, die sich nur durch das Erwähnen bestimmter Namen unterscheiden, und somit von dieser Filterung nicht erfasst werden würden. Somit ist es für die Einheitlichkeit der Daten am Besten, diese Duplikate alle zu belassen, und zu hoffen, dass die einzelnen Topics nicht zu sehr von Formulierungen dominiert und wenig aussagekräftig werden.
-rm(duplicates)
+length(unique(duplicates$tweet_text)) # 94.434 einzigartige Texte in 680.611 Tweets - Jeder Tweet im Schnitt 7 mal.
+length(unique(duplicates$userid)) # Mehr als die Hälfte aller Nutzer haben mind. einen Duplikat-Tweet veröffentlicht.
+# Auch ohne Retweets schaffen es eine bedeutende Menge an Tweets, mehrfach in den Daten aufzuauchen, da sie wortgleich mehrfach gepostet wurden. Zwar lassen sich diese relativ simpel entfernen, aber es finden sich zweifellos auch wortähnliche Tweets bzw. Tweets, die sich nur durch das Erwähnen bestimmter Namen unterscheiden, und somit von dieser Filterung nicht erfasst werden würden. Belässt man jedoch alle Duplikate in den Daten, so werden die Topics von diesen Duplikaten dominiert (exakte Kopien = perfekte Wortähnlichkeit, und somit Dominanten der jw. Topics).
 
-# write_csv(tweets_eng, file.path("Twitter Data/tweets_en-norts.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
-# write_csv(tweets_clean, file.path("Twitter Data/tweets_cleaned.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+# Kompromiss: Belassen von Duplikaten über bestimter Reichweite, Entfernung von Duplikaten mit kaum Reichweite. Auf diese Art und weise wird zwar das Verhalten und die thematischen Verteilungen der IRA-Accounts verändert, ihre Auswirkung auf andere Nutzer wird jedoch kaum vermindert.
+duplicates <- duplicates %>% mutate(interactions = quote_count + reply_count + like_count + retweet_count)
+sum(duplicates$interactions >= 1000); sum(duplicates$interactions >= 100); sum(duplicates$interactions >= 10)
+# 100 erscheint als guter Cutoff-Punkt - 3.636 Tweets sollten auch als Duplikate die Topics nicht dominieren, und gleichzeitig genug Details über Duplikat-Themen in den Daten lassen.
+duplicates <- duplicates[order(duplicates$interactions, decreasing = T), ] # Order, damit unique()/duplicated() immer den reichweitenstärksten Tweet als "Original" zählen
+dupli_filtered <- duplicates[!(duplicated(duplicates$tweet_text)) | duplicates$interactions >= 100, ]
+# Gefiltert zu allen Tweets, die entweder die reichweitenstärksten Duplikat-Tweets sind, oder Interaktionen im dreistelligen Bereich erhielten
+ignored <- duplicates$tweetid[!(duplicates$tweetid %in% dupli_filtered$tweetid)]
+
+
+tweets_clean <- tweets_clean[!(tweets_clean$tweetid %in% ignored),]
+tweets_eng <- tweets_eng[!(tweets_eng$tweetid %in% ignored),]
+
+# write_csv(tweets_eng, file.path("Twitter Data/tweets_en-norts-nodupes.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+# write_csv(tweets_clean, file.path("Twitter Data/tweets_clean-nodupes.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
+rm(duplicates, dupli_filtered, ignored)
 
 # DATEIEN LADEN: 
-# tweets_eng <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
-# tweets_clean <- read_csv("Twitter Data/tweets_cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+# tweets_eng <- read_csv("Twitter Data/tweets_en-norts-nodupes.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+# tweets_clean <- read_csv("Twitter Data/tweets_clean-nodupes.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 
 
 
@@ -527,7 +538,7 @@ toks <- quanteda::tokens(tweets_clean$tweet_text,
 toks <- tokens_remove(tokens_tolower(toks), c(stopwords("en"), "get", "go", "say"))
 toks <- tokens_wordstem(toks)
 dtm <- dfm(toks)
-dtm <- dfm_trim(dtm, min_docfreq = 15)
+dtm <- dfm_trim(dtm, min_docfreq = 15) # Mindest-Worthäufigkeit, um beachtet zu werden
 #dtm
 topfeatures(dtm, n = 50)
 
@@ -580,28 +591,30 @@ k_diff %>% select(-c("Iterationen")) %>% pivot_longer(-K, names_to = "measure", 
 # Lowerbound und Heldout-Wahrscheinlichkeit relativ stabil zwischen 40 und 120 Topics mit je deutlichen Einbußen bei 130 Topics, kaum Exklusivitätsgewinn ab 90 Topics und Gewinn an Kohärenz bei 110 Topics -> 110 Topics als beste Wahl.
 rm(k_diff, select_k, selectk_df)
 
+
+
 # STM - Interpretation ----
 
-stm_model_90 <- stm(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
-                    K = 90,
-                    prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
-                    init.type = "Spectral", max.em.its = 75, seed = 2020)
-# save(stm_model_90, file = "Saved Files/stm_mod_90.RData")
-# DATEN LADEN: load("Saved Files/stm_mod_90.RData")
+stm_model_110 <- stm(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
+                     K = 110,
+                     prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
+                     init.type = "Spectral", max.em.its = 75, seed = 2021)
+# save(stm_model_110, file = "Saved Files/stm_mod_110.RData")
+# DATEN LADEN: load("Saved Files/stm_mod_110.RData")
 
-plot(stm_model_90, type = "summary", xlim = c(0, 0.2), n = 5)
-# Aufgrund der großen Anzahl an Topics ist auch dies ein Plot, der vermutlich nur als abgespeicherte Datei betrachtet werden kann. Abmessungen von 15 x 8 in werden empfohlen.
+plot(stm_model_110, type = "summary", xlim = c(0, 0.2), n = 5)
+# Aufgrund der großen Anzahl an Topics ist auch dies ein Plot, der vermutlich nur als abgespeicherte Datei betrachtet werden kann. Abmessungen von 20 x 8 in werden empfohlen.
 
 # Manuelle Kodierung der Topics basierend auf zentralen Worten (prob ≙ Wahrscheinlichkeit und frex ≙ Exklusivität zu Topic) sowie Top-Tweets des jeweiligen Topics, um Kategorisierung vornehmen zu können.
 
-labels <- labelTopics(stm_model_90, topics = 90, n = 10)
+labels <- labelTopics(stm_model_110, topics = 110, n = 10)
 prob <- list()
 frex <- list()
-for(i in c(1:90)){
+for(i in c(1:110)){
   prob[[i]] <- paste(labels$prob[i,], collapse = ' ')
   frex[[i]] <- paste(labels$frex[i,], collapse = ' ')
 }
-labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), Topics = 1:90)
+labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), Topics = 1:110)
 rm(labels, prob, frex, i)
 
 # Kodierungsregeln:
@@ -612,15 +625,17 @@ rm(labels, prob, frex, i)
 # - Zusätzlich zu dieser groben Einteilung werden auch die jeweils behandelten Themenkomplexe (z.B. Sportnachrichten, Spam-Werbung für ein bestimmtes Produkt, Persönliche Tweets zu Workoutroutinen, ...) erfasst und aufgelistet, um deren Anteil und Verteilung untersuchen zu können.
 # - Auch bestimmte Worte, die sich durch die Tweets ziehen, werden festgehalten, da diese die einzelnen Topics erklären können. Sie werden mit Anführungszeichen als vorkommende Worte im Gegensatz zu abgeleiteten Überschriften markiert.
 
-# Um einer bestimmten Hauptkategorie zugeordnet zu werden, müssen mindestens 6 der top 20 Tweets des jeweiligen Topics der Kategorie entstammen.
-# Um ein Wort zugeordnet zu bekommen, muss es entweder in mindestens 6 der top 20 Tweets oder in den Prob-/Frex-Listen des jeweiligen Topics vorkommen.
-# -> 6/20, damit die Kodierung die Möglichkeit zulässt, bei Topics ohne klaren Fokus alle drei Labels anbringen zu können, ohne die Kodierregeln zu brechen. In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte (Topics 21, 25, 59, 61), oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen (Topics 30, 52, ) wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
+# Um einer bestimmten Hauptkategorie zugeordnet zu werden, müssen mindestens 9 der top 30 Tweets des jeweiligen Topics der Kategorie entstammen.
+# Um ein Wort zugeordnet zu bekommen, muss es entweder in mindestens 9 der top 30 Tweets oder in den Prob-/Frex-Listen des jeweiligen Topics vorkommen.
+# -> 9/30, damit die Kodierung die Möglichkeit zulässt, bei Topics ohne klaren Fokus alle drei Labels anbringen zu können, ohne die Kodierregeln zu brechen. 
 
-top <- 90 #Zu betrachtendes Topic
+#In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte (Topics 21, 25, 59, 61), oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen (Topics 30, 52, ) wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
+
+top <- 7 #Zu betrachtendes Topic
 {
   print(labels_df[top, 1])
   print(labels_df[top, 2])
-  thought <- findThoughts(stm_model_90, n = 20, topics = top, text = tweets_clean$tweet_text[used_documents])$docs[[1]]
+  thought <- findThoughts(stm_model_110, n = 20, topics = top, text = tweets_clean$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " "))
 }
 # Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein .PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.
