@@ -549,7 +549,7 @@ docvars(dtm, "likecount") <- tweets_clean$like_count
 docvars(dtm, "retweetcount") <- tweets_clean$retweet_count
 
 stm_dtm <- convert(dtm, to = "stm")
-# Durch das Entfernen von Stopwords und Nutzernamen werden ca. 2.300 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt.
+# Durch das Entfernen von Stopwords und vorangegangenes Cleaning werden ca. 2.300 der 1,3m Tweets leer (""). Diese können nicht für weitere Analysen verwendet werden und werden hiermit entfernt, was die auftretende Warnung bestätigt.
 
 # save(stm_dtm, file = "Saved Files/stm_dtm.RData")
 # DATEN LADEN: load("Saved Files/stm_dtm.RData")
@@ -562,20 +562,20 @@ rm(dtm, toks)
 # STM - Suche nach K ----
 
 select_k <- searchK(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
-                    K = seq(10, 150, by = 10),
+                    K = seq(20, 120, by = 10),
                     prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
                     init.type = "Spectral", max.em.its = 10, seed = 2021)
-# ACHTUNG: EWIGE LAUFZEIT - mehrere Tage u.U., je nach Hardware - springt bei mir >16gb genutzter Arbeitsspeicher (Anzahl an Topics + Anzahl an Tweets), es ist also fraglich, ob das in dieser Art auf Maschinen mit <= 16gb RAM überhaupt läuft ...
+# ACHTUNG: EWIGE LAUFZEIT - mehrere Tage u.U., je nach Hardware - springt bei mir >16gb genutzter Arbeitsspeicher (Anzahl an Topics + Anzahl an Tweets), es ist also fraglich, ob das in dieser Art auf Maschinen mit unter 32gb RAM überhaupt läuft ...
 
-# save(select_k, file = "Saved Files/selectK_150.RData")
+# save(select_k, file = "Saved Files/selectK.RData")
 # DATEN LADEN: load("Saved Files/selectK_150.RData")
 plot(select_k)
 selectk_df <- data.frame(K = unlist(select_k$results$K), exclus = unlist(select_k$results$exclus),
                          semcoh = unlist(select_k$results$semcoh), heldout = unlist(select_k$results$heldout),
                          residual = unlist(select_k$results$residual), bound = unlist(select_k$results$bound),
                          lbound = unlist(select_k$results$lbound), em.its = unlist(select_k$results$em.its))
-k_diff <- data.frame(K = selectk_df$K[2:15], Iterationen = selectk_df$em.its[2:15])
-for(i in 1:14){
+k_diff <- data.frame(K = selectk_df$K[2:11], Iterationen = selectk_df$em.its[2:11])
+for(i in 1:10){
   k_diff$Exklusivität[i] <- selectk_df$exclus[i+1] - selectk_df$exclus[i]
   k_diff$Kohärenz[i] <- selectk_df$semcoh[i+1] - selectk_df$semcoh[i]
   k_diff$Heldout[i] <- selectk_df$heldout[i+1] - selectk_df$heldout[i]
@@ -588,33 +588,33 @@ k_diff %>% select(-c("Iterationen")) %>% pivot_longer(-K, names_to = "measure", 
   labs(y = "Veränderung zu K-10") + scale_x_continuous(breaks = seq(20, 150, 10)) +
   theme_minimal() +
   theme(legend.position="none")
-# Lowerbound und Heldout-Wahrscheinlichkeit relativ stabil zwischen 40 und 120 Topics mit je deutlichen Einbußen bei 130 Topics, kaum Exklusivitätsgewinn ab 90 Topics und Gewinn an Kohärenz bei 110 Topics -> 110 Topics als beste Wahl.
+# Exklusivität und Heldout-Likelihood stabil ab 90 Topics, Lowerbound-Verlust minimal ab 90, Kohärenzverluste minimal bei 40, 100, 120 Topics -> 90 Topics als beste Wahl. 
 rm(k_diff, select_k, selectk_df)
 
 
 
 # STM - Interpretation ----
 
-stm_model_110 <- stm(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
-                     K = 110,
+stm_model_90 <- stm(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
+                     K = 90,
                      prevalence =~ s(date) + quotecount + replycount + likecount + retweetcount,
                      init.type = "Spectral", max.em.its = 75, seed = 2021)
-# save(stm_model_110, file = "Saved Files/stm_mod_110.RData")
-# DATEN LADEN: load("Saved Files/stm_mod_110.RData")
+# save(stm_model_90, file = "Saved Files/stm_mod_90.RData")
+# DATEN LADEN: load("Saved Files/stm_mod_90.RData")
 
-plot(stm_model_110, type = "summary", xlim = c(0, 0.2), n = 5)
-# Aufgrund der großen Anzahl an Topics ist auch dies ein Plot, der vermutlich nur als abgespeicherte Datei betrachtet werden kann. Abmessungen von 20 x 8 in werden empfohlen.
+plot(stm_model_90, type = "summary", xlim = c(0, 0.2), n = 5)
+# Aufgrund der großen Anzahl an Topics ist auch dies ein Plot, der vermutlich nur als abgespeicherte Datei betrachtet werden kann. Abmessungen von 8 x 18 in werden empfohlen.
 
 # Manuelle Kodierung der Topics basierend auf zentralen Worten (prob ≙ Wahrscheinlichkeit und frex ≙ Exklusivität zu Topic) sowie Top-Tweets des jeweiligen Topics, um Kategorisierung vornehmen zu können.
 
-labels <- labelTopics(stm_model_110, topics = 110, n = 10)
+labels <- labelTopics(stm_model_90, topics = 90, n = 10)
 prob <- list()
 frex <- list()
-for(i in c(1:110)){
+for(i in c(1:90)){
   prob[[i]] <- paste(labels$prob[i,], collapse = ' ')
   frex[[i]] <- paste(labels$frex[i,], collapse = ' ')
 }
-labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), Topics = 1:110)
+labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), Topics = 1:90)
 rm(labels, prob, frex, i)
 
 # Kodierungsregeln:
@@ -631,11 +631,11 @@ rm(labels, prob, frex, i)
 
 #In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte (Topics 21, 25, 59, 61), oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen (Topics 30, 52, ) wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
 
-top <- 7 #Zu betrachtendes Topic
+top <- 1 #Zu betrachtendes Topic
 {
   print(labels_df[top, 1])
   print(labels_df[top, 2])
-  thought <- findThoughts(stm_model_110, n = 20, topics = top, text = tweets_clean$tweet_text[used_documents])$docs[[1]]
+  thought <- findThoughts(stm_model_90, n = 20, topics = top, text = tweets_clean$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " "))
 }
 # Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein .PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.
