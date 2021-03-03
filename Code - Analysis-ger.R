@@ -35,8 +35,10 @@ rm(packages, pkg)
   library(readr)
   library(tidyr)
   library(stringr)
+  library(stringi)
   library(reshape2)
   library(ggplot2)
+  library(corrplot)
   library(gridExtra)
   library(lubridate)
   library(quanteda)
@@ -568,12 +570,20 @@ select_k <- searchK(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
 # ACHTUNG: EWIGE LAUFZEIT - mehrere Tage u.U., je nach Hardware - springt bei mir >16gb genutzter Arbeitsspeicher (Anzahl an Topics + Anzahl an Tweets), es ist also fraglich, ob das in dieser Art auf Maschinen mit unter 32gb RAM überhaupt läuft ...
 
 # save(select_k, file = "Saved Files/selectK.RData")
-# DATEN LADEN: load("Saved Files/selectK_150.RData")
+# DATEN LADEN: load("Saved Files/selectK.RData")
 plot(select_k)
+
 selectk_df <- data.frame(K = unlist(select_k$results$K), exclus = unlist(select_k$results$exclus),
                          semcoh = unlist(select_k$results$semcoh), heldout = unlist(select_k$results$heldout),
                          residual = unlist(select_k$results$residual), bound = unlist(select_k$results$bound),
                          lbound = unlist(select_k$results$lbound), em.its = unlist(select_k$results$em.its))
+
+selectk_df %>% select(-c(em.its, bound, residual)) %>% pivot_longer(-K, names_to = "measure", values_to = "value") %>%
+  ggplot(aes(x = K, y = value, group = measure, color = measure)) +
+  geom_line() + facet_wrap(.~measure, scale = "free", ncol = 2) +
+  labs(y = "Veränderung zu K-10") + scale_x_continuous(breaks = seq(20, 150, 10)) +
+  theme_minimal() + theme(legend.position="none")
+
 k_diff <- data.frame(K = selectk_df$K[2:11], Iterationen = selectk_df$em.its[2:11])
 for(i in 1:10){
   k_diff$Exklusivität[i] <- selectk_df$exclus[i+1] - selectk_df$exclus[i]
@@ -584,12 +594,12 @@ for(i in 1:10){
 
 k_diff %>% select(-c("Iterationen")) %>% pivot_longer(-K, names_to = "measure", values_to = "value") %>%
   ggplot(aes(x = K, y = value, group = measure, color = measure)) + geom_hline(yintercept = 0) +
-  geom_line() + facet_wrap(.~measure, scale = "free", ncol = 2) +
+  geom_line() + facet_wrap(.~measure, scale = "free", nrow = 1) +
   labs(y = "Veränderung zu K-10") + scale_x_continuous(breaks = seq(20, 150, 10)) +
   theme_minimal() +
-  theme(legend.position="none")
-# Exklusivität und Heldout-Likelihood stabil ab 90 Topics, Lowerbound-Verlust minimal ab 90, Kohärenzverluste minimal bei 40, 100, 120 Topics -> 90 Topics als beste Wahl. 
-rm(k_diff, select_k, selectk_df)
+  theme(legend.position="none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.1))
+# Exklusivität und Heldout-Likelihood relativ stabil ab 90 Topics, Lowerbound-Verlust minimal ab 90, Kohärenzverluste minimal bei 40, 100, 120 Topics -> 90 Topics als beste Wahl. 
+rm(k_diff, select_k, selectk_df, i)
 
 
 
@@ -604,44 +614,50 @@ stm_model_90 <- stm(stm_dtm$documents, stm_dtm$vocab, data = stm_dtm$meta,
 
 plot(stm_model_90, type = "summary", xlim = c(0, 0.2), n = 5)
 # Aufgrund der großen Anzahl an Topics ist auch dies ein Plot, der vermutlich nur als abgespeicherte Datei betrachtet werden kann. Abmessungen von 8 x 18 in werden empfohlen.
+# -> Deutliche Dominanz von wenigen (Nachrichten?-)Topics, weite Verteilung der restlichen Topics und Inhalte
 
 # Manuelle Kodierung der Topics basierend auf zentralen Worten (prob ≙ Wahrscheinlichkeit und frex ≙ Exklusivität zu Topic) sowie Top-Tweets des jeweiligen Topics, um Kategorisierung vornehmen zu können.
+  
 
 labels <- labelTopics(stm_model_90, topics = 90, n = 10)
 prob <- list()
 frex <- list()
+mean <- list()
 for(i in c(1:90)){
   prob[[i]] <- paste(labels$prob[i,], collapse = ' ')
   frex[[i]] <- paste(labels$frex[i,], collapse = ' ')
+  mean[[i]] <- mean(stm_model_90$theta[, i])
 }
-labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), Topics = 1:90)
+labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), mean = unlist(mean), Topics = 1:90)
 rm(labels, prob, frex, i)
 
 # Kodierungsregeln:
 # - 3 Hauptkategorien: News, Person, Spam
 #   -> News: Sachlich formulierte Sätze zu aktuellem Geschehen, wie sie sich bei Tweets von Nachrichtenorganisationen zu neuen Themen finden könnten. Das heißt nicht, dass alle diese Tweets tatsächlich von diesen Organisationen kommen, nur, dass keine Wertung aus dem Tweet klar ersichtlich wird.
-#   -> Spam: Tweets, die "normale Menschen" vermutlich nicht posten würden: Entweder, weil der Tweet selbst durch übermäßiges Taggen anderer Nutzer auffällt, eine bedeutende Menge an Emoji beinhaltet (wobei hier der genaue Umbruchpunkt rein subjektiv ist und in meinen Augen  zwischen 4-5 liegt) oder ähnliches Verhalten an den Tag legt. Auf Topic-Ebene: Tweets, die zwar individuell "normal" erscheinen, sich aber über mehrere Tweets hinweg deutlich in Formulierungen und Satzstrukturen ähneln, sodass von einer gemeinsamen Quelle mit spezifischem Ziel ausgegangen werden kann. Bei Spam zu politischen Themen wird zudem eine vermutende Eingruppierung in rechte / linke Ideen und Positionen unterschieden.
+#   -> Spam: Tweets, die "normale Menschen" vermutlich nicht posten würden: Entweder, weil der Tweet selbst durch übermäßiges Taggen anderer Nutzer auffällt, eine bedeutende Menge an Emoji beinhaltet (wobei hier der genaue Umbruchpunkt rein subjektiv ist und in meinen Augen  zwischen 4-5 liegt) oder ähnliches Verhalten an den Tag legt. Auf Topic-Ebene: Tweets, die zwar individuell "normal" erscheinen, sich aber über mehrere Tweets hinweg deutlich in Formulierungen und Satzstrukturen ähneln, sodass von einer gemeinsamen Quelle und/oder spezifischem Ziel ausgegangen werden kann.
 #   -> Person: Tweets über private Angelegenheiten, Zitate, Nachrichtenvermittlung mit wertender Einordnung; Tweets wie sie ein "normaler Mensch" schreiben könnte.
-# - Zusätzlich zu dieser groben Einteilung werden auch die jeweils behandelten Themenkomplexe (z.B. Sportnachrichten, Spam-Werbung für ein bestimmtes Produkt, Persönliche Tweets zu Workoutroutinen, ...) erfasst und aufgelistet, um deren Anteil und Verteilung untersuchen zu können.
+# - Zusätzlich zu dieser groben Einteilung werden auch die jeweils behandelten Themenkomplexe (z.B. Sportnachrichten, Spam-Werbung für ein bestimmtes Produkt, Persönliche Tweets zu Workoutroutinen, ...) anhand der Top-Tweets und häufigsten/exklusivsten Worte erfasst und aufgelistet, um deren Anteil und Verteilung untersuchen zu können.
 # - Auch bestimmte Worte, die sich durch die Tweets ziehen, werden festgehalten, da diese die einzelnen Topics erklären können. Sie werden mit Anführungszeichen als vorkommende Worte im Gegensatz zu abgeleiteten Überschriften markiert.
 
-# Um einer bestimmten Hauptkategorie zugeordnet zu werden, müssen mindestens 9 der top 30 Tweets des jeweiligen Topics der Kategorie entstammen.
-# Um ein Wort zugeordnet zu bekommen, muss es entweder in mindestens 9 der top 30 Tweets oder in den Prob-/Frex-Listen des jeweiligen Topics vorkommen.
-# -> 9/30, damit die Kodierung die Möglichkeit zulässt, bei Topics ohne klaren Fokus alle drei Labels anbringen zu können, ohne die Kodierregeln zu brechen. 
+# Um einer bestimmten Hauptkategorie zugeordnet zu werden, müssen mindestens 6 der top 20 Tweets des jeweiligen Topics der Kategorie entstammen.
+# Um ein Wort zugeordnet zu bekommen, muss es entweder in mindestens 6 der top 20 Tweets oder in den Prob-/Frex-Listen des jeweiligen Topics vorkommen.
+# -> 6/20, damit die Kodierung die Möglichkeit zulässt, bei Topics ohne klaren Fokus alle drei Labels anbringen zu können, ohne die Kodierregeln zu brechen. 
 
-#In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte (Topics 21, 25, 59, 61), oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen (Topics 30, 52, ) wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
+#In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte, oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen  wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
 
-top <- 1 #Zu betrachtendes Topic
+top <- 54 #Zu betrachtendes Topic
 {
   print(labels_df[top, 1])
   print(labels_df[top, 2])
-  thought <- findThoughts(stm_model_90, n = 20, topics = top, text = tweets_clean$tweet_text[used_documents])$docs[[1]]
+  print(labels_df[top, 3])
+  thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " "))
 }
 # Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein .PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.
 
 # Die Topics mit dem größten erwarteten Anteil drehen sich um lokale Verbrechen (Top. 68, Platz 1), Sport (Top. 71, Platz 2) und Gerichte und -entscheidungen (Top. 66, Platz 3). ALl diese Topics wurden als "News" deklariert. Das erste "Person"-Topic liegt auf Platz 4 (Top. 2, "Workout"), das erste Spam-Topic auf Platz 9 (Top. 39, Ukraine-Verschwörungstheorie).
-rm(thought, top)
+rm(thought, top, labels_df)
 
 
 ### Topic-Korrelation
@@ -663,7 +679,7 @@ corrplot(corr, order = "hclust", hclust.method = "complete",
          #col = rev(colorRamp("blue2red")))
          col = c(rev(gray.colors(120))[1:43], "white", rev(gray.colors(120))[78:120]))
 # Für bessere Betrachtung: Abspeicherung als .pdf (10" x 10") wird empfohlen.
-rm(dissim, dist_mat)
+rm(dissim, dist_mat, corr)
 
 
 ### Topic-Verteilungen
@@ -674,20 +690,46 @@ for (i in 1:length(dates)) {
   if (nchar(dates[i]) == 6) {
     stri_sub(dates[i], 6, 5) <- 0
   }
-}
+} # Vereinheitlichung, "2016-8" zu "2016-08"
 topic_times <- data.frame(dates, stm_model_90$theta)
 counts <- topic_times %>% count(dates)
 colnames(topic_times) <- c("date", paste("topic_",1:90, sep = ""))
 topic_times <- aggregate(.~date, FUN = mean, data = topic_times)
+topic_times_added <- topic_times # Topic mit jeweils vorherigen Topics aufsummiert für einfacheres Plotting
+for(r in 1:nrow(topic_times_added)){
+  for(c in 3:91){
+    topic_times_added[r, c] <- topic_times_added[r, c] + topic_times_added[r, c-1]
+  }
+}
 topic_times <- topic_times %>% mutate(count = counts[,2])
+topic_times_added <- topic_times_added %>% mutate(count = counts[,2])
 
 topic_times.long <- reshape2::melt(topic_times, id.vars = c("date", "count"))
 ggplot(topic_times.long, aes(x = date, y = value * count, group = variable, color = variable)) +
   geom_line() + geom_line(aes(x = date, y = count), color = "black") +
   scale_y_sqrt() + theme_minimal() +
-  labs(title = "Topic-Anteile gemittelt nach Woche", y = "Anzahl an Tweets", x = "Kalenderwoche") +
-  scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 2)]) +
+  labs(y = "Anzahl an Tweets", x = "Kalenderwoche") +
+  scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 3)]) +
   theme(axis.text.x = element_text(size = 9, angle = 90), legend.position = "none")
+# Export als .png, 1227x900 Pixel, einmal mit Legende, und einmal ohne -> Farben extrahiert für eigens erstellte Legende, sowie Zurechtschieben Kalenderwochen
+
+topic_times_added.long <- reshape2::melt(topic_times_added, id.vars = c("date", "count"))
+ggplot(topic_times_added.long, aes(x = date, y = value * count, group = variable, color = variable)) +
+  geom_line() +
+  scale_y_sqrt() + theme_minimal() +
+  labs(y = "Anzahl an Tweets", x = "Kalenderwoche") +
+  scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 1)]) +
+  theme(axis.text.x = element_text(size = 9, angle = 90), legend.position = "none")
+
+# Maximale Themen je Woche
+max_topics <- data.frame(date = topic_times$date, topic = "")
+for(i in 1:nrow(max_topics)){
+  max_topics$topic[i] <- as.character(which(topic_times[i, 2:91] == max(topic_times[i, 2:91])))
+}
+sort(table(max_topics$topic), decreasing = T) # Mehrere Topics mit konstant dominanten Tweet-Mengen
+sort(table(max_topics$topic[1:125]), decreasing = T) # Topic 3 bis Ende 2014 (#125 = KW 52 2014) dominant
+sort(table(max_topics$topic[126:262]), decreasing = T) # Topic 68 bis Mitte 2017 (#262 = KW 31 2017) dominant
+sort(table(max_topics$topic[43]), decreasing = T) # Topic 17 ab Mitte 2017 dominant
 
 # Gruppiert nach Themenkomplex
 topic_grp <- topic_times %>% select(-c(date, count))
@@ -702,15 +744,17 @@ colnames(topic_grp) <- c(grp_names, "date", "count")
 
 topic_grp.long <- reshape2::melt(topic_grp, id.vars = c("date", "count"))
 ggplot(topic_grp.long, aes(x = date, y = value, group = variable, color = variable)) + 
-  geom_line() + theme(legend.position = "bottom") + 
-  labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
+  geom_line() +  labs(y = "Anteil", x = "Kalenderwoche") +
   theme(axis.text.x = element_text(angle = 90)) + theme_minimal()
 
 ggplot(topic_grp.long, aes(x = date, y = value * 100, fill = variable)) + 
   geom_bar(position="stack", stat="identity") + theme_minimal() + 
   scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 2)]) +
-  labs(title = "Tweet-Kategorien gemittelt nach Woche", y = "Anteil", x = "Kalenderwoche") +
+  labs(y = "Anteil", x = "Kalenderwoche") +
   theme(axis.text.x = element_text(size = 9, angle = 90), legend.position = "bottom")
+
+rm(counts, topic_grp, topic_grp.long, topic_times, topic_times.long, topic_times_added, topic_times_added.long,
+   c, r, i, grp_names)
 
 # Rückbezug auf Accounts ----
 
@@ -729,8 +773,8 @@ for(i in 1:nrow(tweets_stm)){
   tweets_stm[i, 15] <- which(stm_model_90$theta[i, ] == max(stm_model_90$theta[i, ]))
   tweets_stm[i, 16] <- label_csv[unlist(tweets_stm[i, 15]), 2]
   tweets_stm[i, 17] <- max(stm_model_90$theta[i, ])
-}
-# Zuordnung der Topics zu Tweets nach jw. Maximal-Theta des Tweet-Dokuments laut STM-Modell
+} # Zuordnung der Topics zu Tweets nach jw. Maximal-Theta des Tweet-Dokuments laut STM-Modell - Lange Laufzeit
+# write_csv(tweets_stm, file.path("Other Files/tweets_stm_safetybackup.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double") Just in case
 
 topic_prop <- data.frame(topic = 1:90, sum = 0)
 for(i in 1:nrow(topic_prop)){
@@ -768,38 +812,43 @@ for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) +
   scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
   labs(title = "Anzahl an Interaktionen je Tweet und Topic", x = "Topic-Nummer", y = "Anzahl an Tweets je Topic",
        subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
-# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen-, Spam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Die mit Abstand meisten Tweets fallen dabei auf ein News-Topic.
+# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen-, Spam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Die mit Abstand meisten Tweets fallen dabei auf ein einziges News-Topic.
 news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
 news_top68$tweet_text[sample(1:nrow(news_top68), 50)]
 head(news_top68$tweet_text, 50)
 # Dieses Topic umfasst dominant Berichte über krimineller Handlungen. Interessanterweise lassen sich zwei generelle Anätze in der Berichterstattung erkennen: Anti-Islam/Anti-Flüchtling/Pro-Trump-Tweets und Anti-Cop/Pro-BlackLivesMatter-Tweets.
 
 # Zusäzlich lässt sich festhalten, dass die meisten Tweets keine einzige Interaktion aufweisen, und nur eine sehr kleine Minderheit mehr als 100 Interaktionen ansammeln konnte.
-for.plot %>% filter(interactions > 500) %>% ggplot(aes(x = max.topic, y = interactions, group = max.topic)) + geom_boxplot() +
+for.plot %>% filter(interactions > 500) %>% ggplot(aes(x = max.topic, y = interactions, group = max.topic)) + geom_boxplot() + 
+  #geom_hline(yintercept = 100000) + 
   scale_y_continuous(trans = "log", labels = scales::number, breaks = c(600, 2000, 6000, 20000, 60000, 200000)) + 
   theme_minimal() + facet_wrap(~ topic_grp, nrow = 4) +
   scale_x_continuous(breaks = c(1, 5, 10 ,15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90)) +
   labs(title = "Anzahl an Tweet-Interaktionen je Topic", x = "Topic-Nummer", y = "Interaktionen je Tweet")
-# Das bedeutet jedoch nicht, dass die Topics sich strukturell in ihren Reichweite-Potenzialen unterscheiden. Ein sehr großer Anteil an Topics aus allen Bereichen weist Tweets mit mehr als 50.000 Interaktionen auf. Dominant in Tweet-Anzahl und Interaktionsgröße sind hierbei zwei "Personal"- sowie zwei undefinierte Topics.
+# Das bedeutet jedoch nicht, dass die Topics sich strukturell in ihren Reichweite-Potenzialen unterscheiden. Ein sehr großer Anteil an Topics aus allen Bereichen weist Tweets mit fünf- oder mehrstelligen Interaktionen auf.
+
+# "News"-Topics mit >100k-Interaktionen-Tweets:
+tweets_stm %>% filter(max.topic == 39) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
+tweets_stm %>% filter(max.topic == 57) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 
 # "Undefiniert"-Topics mit >100k-Interaktionen-Tweets:
 tweets_stm %>% filter(max.topic == 15) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 tweets_stm %>% filter(max.topic == 23) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
-tweets_stm %>% filter(max.topic == 69) %>% filter(interactions > 0) %>% 
-  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
-tweets_stm %>% filter(max.topic == 72) %>% filter(interactions > 0) %>% 
+tweets_stm %>% filter(max.topic == 75) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 # Während die reichweitenstärksten Tweets des ersten der vier Topics eindeutig die Errungenschaften und Geschichten weiblicher PoC feiert, zeigt sich das zweite Topic weniger eindeutig. So finden sich neben zwei Tweets zu afrikanischen Sportlern und Doktoren dominant Tweets zu rechten Themen und Personen wie Ted Cruz und Laura Loomer - Auch wenn das Gesamtbild hier weniger eindeutig ist, als im ersten Topic. Das dritte Topic ist ebenfalls gemischt - obwohl ein dominanter Teil der Tweets sich mit Themen des Trump-Universums auseinandersetzt, finden sich drei wortgleiche Tweets, die Trump kritisieren udn angreifen. Topic vier beschäftigt sich erneut hauptsächlich mit schwarzen Amerikanern - wobei hier keine klare Rechts-Links-Zuordnung möglich ist, da sich Tweets für beide Seiten finden.
 
 # "Person"-Topics mit >100k-Interaktionen-Tweets:
-tweets_stm %>% filter(max.topic == 2) %>% filter(interactions > 0) %>%
+tweets_stm %>% filter(max.topic == 29) %>% filter(interactions > 0) %>%
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
-tweets_stm %>% filter(max.topic == 42) %>% filter(interactions > 0) %>%
+tweets_stm %>% filter(max.topic == 36) %>% filter(interactions > 0) %>%
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 tweets_stm %>% filter(max.topic == 57) %>% filter(interactions > 0) %>%
-  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) # NOTE: Die hier vorkommenden \u... stammen von in der Emoji-Ersetzung nicht erfassten Hautfarben-Modifikatoren. Diese Modifikatoren betreffen dabei immer das vorangehende Emoji und lassen sich am letzten Buchstaben identifizieren - von B für die hellste Stufe bis F für die dunkelste.
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 tweets_stm %>% filter(max.topic == 59) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) 
 # Während die Top-Posts des vierten untersuchten Personen-Topics hauptsächlich in die Kategorie "Feelgood-Posts" zu gehören scheinen (auch wenn hier festzuhalten ist, dass ein großer Teil der Postings sich auf schwarze Kinder zu beziehen scheint), weisen die anderen drei Topics erneut politische Themen auf. Das erste untersuchte Topic beschäftigt sich dabei                                                                                   . findet sich im ersten betrachteten Topic ein ähnliches Bild wie in Topic 15, nur mit einem stärkeren Bezug auf aktuelle, negative Ereignisse wie den Tod Trayvon Martins oder die Feuerung Colin Kapernicks
@@ -815,15 +864,10 @@ for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) +
   scale_fill_discrete(name = "Summe erhalte-\nner Interaktionen\nje Antwort", labels = c(">1000", ">100-1000", "1-100", "0")) +
   labs(title = "Anzahl an Antworten auf andere Tweets", x = "Topic-Nummer", y = "Anzahl an Antwort-Tweets",
        subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
-# Klare Dominanz von Antworten bei Spam-Tweets und persönlichen Tweets, mit deutlichen Unterschieden je nach Topic.
+# Klare Dominanz von Antworten bei Spam-Tweets, mit deutlichen Unterschieden je nach Topic.
 
 
 
-# Top-Antwort-Topics aus "Person"-Kategorie
-replies_stm %>% filter(max.topic == 1) %>% filter(interactions > 0) %>%
-  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
-replies_stm %>% filter(max.topic == 2) %>% filter(interactions > 0) %>%
-  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 
 
 
@@ -851,10 +895,12 @@ replies_stm_int %>% mutate(src_grp = ifelse(src_grp %in% c("News", "Person", "Sp
   scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) +
   scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
   labs(title = "Zieltopics interner Antworten", x = "Topic-Nummer", y = "Antworten auf jw. Topic") + facet_wrap(~ src_grp, nrow = 4)
-# Das Topic mit den meisten Tweets dominiert mit den meisten Antworten. Die Topics #70 (Spam) und #81 (News) erhielten aber deutlich mehr Antworten, als sie anteilsmäßig an Tweets aufweisen.
+# Das Topic mit den meisten Tweets dominiert mit den meisten erhaltenen Antworten. Die Topics #70 (Spam) und #89 (News) erhielten aber deutlich mehr Antworten, als sie anteilsmäßig an Tweets aufweisen.
+tweets_stm %>% filter(max.topic == 69) %>% filter(interactions > 0) %>% 
+  arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
 tweets_stm %>% filter(max.topic == 70) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text)
-tweets_stm %>% filter(max.topic == 81) %>% filter(interactions > 0) %>% 
+tweets_stm %>% filter(max.topic == 89) %>% filter(interactions > 0) %>% 
   arrange(desc(interactions)) %>% select(tweet_text) %>% head(n = 15) %>% pull(tweet_text) 
 # Dominant anti-Flüchtlings- und anti-Islam-Rhetorik.
 
