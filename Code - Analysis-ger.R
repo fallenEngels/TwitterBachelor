@@ -629,7 +629,7 @@ for(i in c(1:90)){
   mean[[i]] <- mean(stm_model_90$theta[, i])
 }
 labels_df <- data.frame(Prob = unlist(prob), Frex = unlist(frex), mean = unlist(mean), Topics = 1:90)
-rm(labels, prob, frex, i)
+rm(labels, prob, frex, mean, i)
 
 # Kodierungsregeln:
 # - 3 Hauptkategorien: News, Person, Spam
@@ -645,7 +645,7 @@ rm(labels, prob, frex, i)
 
 #In Fällen, bei denen die Zuordnung knapp an dieser Grenze scheiterte, oder bei denen eine genauere Betrachtung vonnöten war, um die Inhalte einzuordnen  wurden die top 30 Tweets betrachtet und mit 9 Tweets als Schwellenwert gearbeitet.
 
-top <- 54 #Zu betrachtendes Topic
+top <- 46 #Zu betrachtendes Topic
 {
   print(labels_df[top, 1])
   print(labels_df[top, 2])
@@ -655,13 +655,14 @@ top <- 54 #Zu betrachtendes Topic
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " "))
 }
 # Aufgrund der Länge einiger Spam-Tweets (durch das Ausschreiben der Emoji) kann es hilfreich sein, die Grafiken abzuspeichern und dann zu betrachten. Ein .PNG mit einer Hohe von 2000 Pixeln sollte dabei ausreichen.
-
-# Die Topics mit dem größten erwarteten Anteil drehen sich um lokale Verbrechen (Top. 68, Platz 1), Sport (Top. 71, Platz 2) und Gerichte und -entscheidungen (Top. 66, Platz 3). ALl diese Topics wurden als "News" deklariert. Das erste "Person"-Topic liegt auf Platz 4 (Top. 2, "Workout"), das erste Spam-Topic auf Platz 9 (Top. 39, Ukraine-Verschwörungstheorie).
+label_csv <- read.csv("Other Files/STM_TopicLabels.csv", sep = ';', stringsAsFactors = F)
+labels_df %>% mutate(content = label_csv$Label, group = label_csv$Group) %>% arrange(desc(mean)) %>% 
+  select(-c(Prob, Frex)) %>% head(., 10)
+# Die Topics mit dem größten erwarteten Anteil drehen sich um lokale Verbrechen (Top. 68, Platz 1), Sport (Top. 72, Platz 2) und Gerichte und -entscheidungen (Top. 66, Platz 3). All diese Topics wurden als "News" deklariert. Das erste nicht-"News"-Topic liegt als Kombination Person/Spam auf Platz 4 (Top. 3, "Workout"), das erste "Spam"-Topic beinhaltet Verschwörungstheorien zu einem scheinbar unsicheren ukrainischen Nuklear-Reaktor.
 rm(thought, top, labels_df)
 
 
 ### Topic-Korrelation
-label_csv <- read.csv("Other Files/STM_TopicLabels.csv", sep = ';', stringsAsFactors = F)
 
 corr <- cor(stm_model_90$theta[,1:90])
 dissim <- 1 - corr
@@ -756,7 +757,7 @@ ggplot(topic_grp.long, aes(x = date, y = value * 100, fill = variable)) +
 rm(counts, topic_grp, topic_grp.long, topic_times, topic_times.long, topic_times_added, topic_times_added.long,
    c, r, i, grp_names)
 
-# Rückbezug auf Accounts ----
+# Rückbezug auf Originaltweets ----
 
 # Cleaning, um nur tatsächlich genutzte Dokumente zu analysieren
 tweets_stm <- tweets_clean[used_documents, ]
@@ -796,6 +797,69 @@ ggplot(tweets_stm, aes(x = max.topic, y = max_prop, group = max.topic, fill = co
 
 # write_csv(tweets_stm, file.path("Other Files/tweets_stm.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
 # DATEIEN LADEN: tweets_stm <- read_csv("Other Files/tweets_stm.csv", col_types = cols(tweetid = col_character(), in_reply_to_tweetid = col_character(), quoted_tweet_tweetid = col_character()))
+
+### Inhaltsanalysen ----
+
+### Verschwörungstheorien
+# Ukrainischer Nuklearreaktor
+top <- 40 # Topics: 31, 40, 46
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+consp.ukrNPP <- tweets_stm[grepl("fukushima2015|fukushimaagain|chernobyl2015|Nukraine", tweets_stm$tweet_text, ignore.case = T), ]
+consp.ukrNPP <- consp.ukrNPP %>% mutate(conspiracy = "3 NPP Ukraine\nJan. 2015")
+
+# Columbian Chemicals
+top <- 33 # Topics: 24, 26, 33
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+consp.ColChem <- tweets_stm[grepl("columbianchemicals|columbianchemicalsinneworleans|Louisianaexplosion",
+                                  tweets_stm$tweet_text, ignore.case = T), ]
+consp.ColChem <- consp.ColChem %>% mutate(conspiracy = "1 Columbian Chemicals Explosion\nSep. 2014")
+
+# Ebola in den USA
+top <- 51 # Topics: 33, 51
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+consp.Ebola <- tweets_stm[grepl("Ebolainatlanta|YattaQuirre", tweets_stm$tweet_text, ignore.case = T), ]
+consp.Ebola <- consp.Ebola %>% mutate(conspiracy = "2 Ebola in Atlanta\nDez. 13/14 2014")
+
+# Verunreinigtes Trinkwasser
+top <- 64 # Topic: 64
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+consp.Water <- tweets_stm[grepl("phosphorusdisaster", tweets_stm$tweet_text, ignore.case = T), ]
+consp.Water <- consp.Water %>% mutate(conspiracy = "4 Polluted Water\nMar. 10 2015")
+
+# Vergiftete Truthäne
+top <- 61 # Topic: 61
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+consp.Turkey <- tweets_stm[grepl("kochfarms|foodpoisoning", tweets_stm$tweet_text, ignore.case = T), ]
+# Ein einzelner Tweet nur mit #Foodpoisoning ohne Bezug zu Thanksgiving
+consp.Turkey <- consp.Turkey %>% filter(tweet_time >= "2015-11-26")
+consp.Turkey <- consp.Turkey %>% mutate(conspiracy = "5 Poisoned Turkey\nNov./Dez. 2015")
+
+conspiracy_df <- rbind(consp.ColChem, consp.Ebola, consp.Turkey, consp.ukrNPP, consp.Water)
+conspiracy_df %>% select(tweet_time, conspiracy) %>% ggplot(aes(x = tweet_time, fill = conspiracy)) +
+  geom_histogram(bins = 30, colour = "black") + facet_wrap(.~conspiracy, scale = "free", ncol = 3) + 
+  theme_minimal() +labs(x = "Tweet-Uhrzeit", y = "Anzahl an Tweets") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5), legend.position = "none")
+  
+
+### Strukturanalysen ----
+
+
+
+
+
+
+
+
 
 
 # Interaktionen und Tweet-Mengen nach Topics
