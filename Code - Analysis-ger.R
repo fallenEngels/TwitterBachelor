@@ -680,6 +680,7 @@ corrplot(corr, order = "hclust", hclust.method = "complete",
          #col = rev(colorRamp("blue2red")))
          col = c(rev(gray.colors(120))[1:43], "white", rev(gray.colors(120))[78:120]))
 # Für bessere Betrachtung: Abspeicherung als .pdf (10" x 10") wird empfohlen.
+# Kaum wirkliche Korrelationen, nur Antwort-Topic korrelliert mit so ziemlich jedem anderen Topic
 rm(dissim, dist_mat, corr)
 
 
@@ -750,20 +751,23 @@ ggplot(topic_grp.long, aes(x = date, y = value, group = variable, color = variab
 
 ggplot(topic_grp.long, aes(x = date, y = value * 100, fill = variable)) + 
   geom_bar(position="stack", stat="identity") + theme_minimal() + 
-  scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 2)]) +
-  labs(y = "Anteil", x = "Kalenderwoche") +
+  scale_fill_brewer(palette="Set1") +
+  scale_x_discrete(breaks = topic_times$date[seq(1, length(topic_times.long$date), by = 4)]) +
+  labs(y = "Anteil in %", x = "Kalenderwoche", fill = "Themengruppe") +
   theme(axis.text.x = element_text(size = 9, angle = 90), legend.position = "bottom")
+# AUch hier wieder manuelles Verschieben der X-Achsen-Labels notwendig
 
 rm(counts, topic_grp, topic_grp.long, topic_times, topic_times.long, topic_times_added, topic_times_added.long,
    c, r, i, grp_names)
 
+
+
 # Rückbezug auf Originaltweets ----
 
 # Cleaning, um nur tatsächlich genutzte Dokumente zu analysieren
-tweets_stm <- tweets_clean[used_documents, ]
+tweets_stm <- tweets_eng[used_documents, ]
 length(unique(tweets_stm$userid))
 length(unique(tweets_clean$userid))
-rm(tweets_clean)
 
 tweets_stm <- tweets_stm %>% 
   select(c(tweetid, userid, tweet_text, tweet_time, in_reply_to_tweetid, in_reply_to_userid, quoted_tweet_tweetid, 
@@ -794,89 +798,175 @@ ggplot(tweets_stm, aes(x = max.topic, y = max_prop, group = max.topic, fill = co
   scale_fill_continuous(trans = "sqrt",labels = scales::number, breaks = c(1000, 10000, 50000, 100000),
                         name = "Anzahl\nan Tweets\nje Topic", low = "dark red", high = "white")
 # Auch wenn alle Topics Tweets mit thetha-Werten über das gesamte Spektrum beinhalten, finden sich doch einige Topics mit deutlich höheren Werten - 4 der Topics haben sogar einen Median von über 0,5.
+summary(tweets_stm$max_prop)
+ggplot(tweets_stm, aes(x = max_prop)) + geom_histogram(colour = "black", fill = "white", bins = 200) + 
+  theme_minimal() + labs(x = "max. Theta-Wert des Tweets", y = "Anzahl")
+# Während ~8.000 Dokumente quasi eindeutig zugeordnet wurden, ist die Zuordnung für den Großteil der Tweets nicht wirklich eindeutig, was gegen die Erklärkraft des STM-Modells für die Gesamtheit des Datensets spricht.
 
 # write_csv(tweets_stm, file.path("Other Files/tweets_stm.csv"), na = "NA", append = FALSE, col_names = T, quote_escape = "double")
 # DATEIEN LADEN: tweets_stm <- read_csv("Other Files/tweets_stm.csv", col_types = cols(tweetid = col_character(), in_reply_to_tweetid = col_character(), quoted_tweet_tweetid = col_character()))
 
-### Inhaltsanalysen ----
 
-### Verschwörungstheorien
+
+### Inhaltsanalysen ----
+tweets_eng_raw <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+# Analysen anhand STM-Toptweets auf jeweils verwendete Formulierungen/Hashtags/..., dann Durchsuchung des Original-Datensets (englisch, keine Retweets, mit Duplikaten), um Reichweite und Umfang einschätzen zu können
+
+### Falschnachrichten
 # Ukrainischer Nuklearreaktor
 top <- 40 # Topics: 31, 40, 46
-{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top,
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-consp.ukrNPP <- tweets_stm[grepl("fukushima2015|fukushimaagain|chernobyl2015|Nukraine", tweets_stm$tweet_text, ignore.case = T), ]
-consp.ukrNPP <- consp.ukrNPP %>% mutate(conspiracy = "3 NPP Ukraine\nJan. 2015")
+consp.ukrNPP <- tweets_eng_raw[grepl("fukushima2015|fukushimaagain|chernobyl2015|Nukraine", 
+                                     tweets_eng_raw$tweet_text, ignore.case = T), ]
+consp.ukrNPP <- consp.ukrNPP %>% mutate(conspiracy = "3 NPP Ukraine\nJan. 2015", 
+                                        interaction = reply_count + retweet_count + like_count + quote_count)
+summary(consp.ukrNPP$interaction)
+sum(grepl("fukushima2015|fukushimaagain|chernobyl2015|Nukraine", tweets_stm$tweet_text, ignore.case = T))
 
 # Columbian Chemicals
 top <- 33 # Topics: 24, 26, 33
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-consp.ColChem <- tweets_stm[grepl("columbianchemicals|columbianchemicalsinneworleans|Louisianaexplosion",
-                                  tweets_stm$tweet_text, ignore.case = T), ]
-consp.ColChem <- consp.ColChem %>% mutate(conspiracy = "1 Columbian Chemicals Explosion\nSep. 2014")
+consp.ColChem <- tweets_eng_raw[grepl("columbianchemicals|columbianchemicalsinneworleans|Louisianaexplosion",
+                                      tweets_eng_raw$tweet_text, ignore.case = T), ]
+consp.ColChem <- consp.ColChem %>% mutate(conspiracy = "1 Columbian Chemicals Explosion\nSep. 2014", 
+                                          interaction = reply_count + retweet_count + like_count + quote_count)
+summary(consp.ColChem$interaction)
+sum(grepl("columbianchemicals|columbianchemicalsinneworleans|Louisianaexplosion", tweets_stm$tweet_text, ignore.case = T))
 
 # Ebola in den USA
 top <- 51 # Topics: 33, 51
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-consp.Ebola <- tweets_stm[grepl("Ebolainatlanta|YattaQuirre", tweets_stm$tweet_text, ignore.case = T), ]
-consp.Ebola <- consp.Ebola %>% mutate(conspiracy = "2 Ebola in Atlanta\nDez. 13/14 2014")
+consp.Ebola <- tweets_eng_raw[grepl("Ebolainatlanta|YattaQuirre", tweets_eng_raw$tweet_text, ignore.case = T), ]
+consp.Ebola <- consp.Ebola %>% mutate(conspiracy = "2 Ebola in Atlanta\nDez. 13/14 2014", 
+                                      interaction = reply_count + retweet_count + like_count + quote_count)
+summary(consp.Ebola$interaction)
+sum(grepl("Ebolainatlanta|YattaQuirre", tweets_stm$tweet_text, ignore.case = T))
 
 # Verunreinigtes Trinkwasser
 top <- 64 # Topic: 64
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-consp.Water <- tweets_stm[grepl("phosphorusdisaster", tweets_stm$tweet_text, ignore.case = T), ]
-consp.Water <- consp.Water %>% mutate(conspiracy = "4 Polluted Water\nMar. 10 2015")
+consp.Water <- tweets_eng_raw[grepl("phosphorusdisaster", tweets_eng_raw$tweet_text, ignore.case = T), ]
+consp.Water <- consp.Water %>% mutate(conspiracy = "4 Polluted Water\nMar. 10 2015", 
+                                      interaction = reply_count + retweet_count + like_count + quote_count)
+summary(consp.Water$interaction)
+sum(grepl("phosphorusdisaster", tweets_stm$tweet_text, ignore.case = T))
 
 # Vergiftete Truthäne
 top <- 61 # Topic: 61
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-consp.Turkey <- tweets_stm[grepl("kochfarms|foodpoisoning", tweets_stm$tweet_text, ignore.case = T), ]
+consp.Turkey <- tweets_eng_raw[grepl("kochfarms|foodpoisoning", tweets_eng_raw$tweet_text, ignore.case = T), ]
 # Ein einzelner Tweet nur mit #Foodpoisoning ohne Bezug zu Thanksgiving
-consp.Turkey <- consp.Turkey %>% filter(tweet_time >= "2015-11-26")
-consp.Turkey <- consp.Turkey %>% mutate(conspiracy = "5 Poisoned Turkey\nNov./Dez. 2015")
+consp.Turkey <- consp.Turkey %>% filter(tweet_time >= "2015-11-26") %>% 
+  mutate(conspiracy = "5 Poisoned Turkey\nNov./Dez. 2015", interaction = reply_count + retweet_count + like_count + quote_count)
+summary(consp.Turkey$interaction)
+sum(grepl("kochfarms|foodpoisoning", tweets_stm$tweet_text, ignore.case = T))
+
 
 conspiracy_df <- rbind(consp.ColChem, consp.Ebola, consp.Turkey, consp.ukrNPP, consp.Water)
 conspiracy_df %>% select(tweet_time, conspiracy) %>% ggplot(aes(x = tweet_time, fill = conspiracy)) +
   geom_histogram(bins = 30, colour = "black") + facet_wrap(.~conspiracy, scale = "free", ncol = 3) + 
   theme_minimal() +labs(x = "Tweet-Uhrzeit", y = "Anzahl an Tweets") +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5), legend.position = "none")
-  
+
+rm(consp.ColChem, consp.Ebola, consp.Turkey, consp.ukrNPP, consp.Water, conspiracy_df)
+
+
+### Gesellschaft/Politik
+# Texit
+top <- 6 # Topic: 6
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.Texit <- tweets_stm[grepl("texit", tweets_stm$tweet_text, ignore.case = T), ]
+# Ein News-Tweet aus 2017 hat nichts mit dem Rest zu tun
+soc.Texit <- soc.Texit %>% filter(tweet_time <= "2017-01-01") %>%
+  mutate(interaction = reply_count + retweet_count + like_count + quote_count)
+summary(soc.Texit$interaction)
+
+# Polizeigewalt
+top <- 81 # Topics: 78, 81
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.PolBrut <- tweets_stm[grepl("policeabuse|policebrutality|policestate|baltimorevsracism|copswillbecops",
+                                tweets_stm$tweet_text, ignore.case = T), ]
+# Hashtags statt Tweet_text, da "acab" Johnny Depps Chupacabra mit abgreift
+ggplot(soc.PolBrut, aes(x = tweet_time)) + geom_histogram(bins = 100)
+summary(soc.PolBrut$interaction)
+
+
+# Black Representation
+top <- 81 # Topics: 78, 81
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.PolBrut <- tweets_stm[grepl("policeabuse|acab|policebrutality|policestate|baltimorevsracism|copswillbecops",
+                                tweets_stm$hashtags, ignore.case = T), ] 
+
+# Clinton-Emails
+top <- 55 # Topic: 55
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.Clinton <- tweets_stm[grepl("clinton",tweets_stm$tweet_text, ignore.case = T) &
+                            grepl("mail",tweets_stm$tweet_text, ignore.case = T), ]
+
+# Ehe für alle
+top <- 55 # Topic: 55
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.Clinton <- tweets_stm[grepl("clinton.*mail|mail.*clinton|podesta.*mail|mail.*podesta",
+                                tweets_stm$tweet_text, ignore.case = T), ]
+
+# Wikileaks
+top <- 55 # Topic: 55
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.Wiki <- tweets_stm[grepl("wikileaks|vault.*7",tweets_stm$tweet_text, ignore.case = T), ]
+
+# Seth Rich
+top <- 5 # Topic: 55
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.SethRich <- tweets_stm[grepl("seth rich|sethrich|dnc staffer",tweets_stm$tweet_text, ignore.case = T), ]
+
+# Pizzagate und QAnon generell
+soc.Conspir <- tweets_stm[grepl("pizzagate|qanon|podesta.*art|art.*podesta",tweets_stm$tweet_text, ignore.case = T), ]
+
 
 ### Strukturanalysen ----
 
-
-
-
-
-
-
-
-
-
 # Interaktionen und Tweet-Mengen nach Topics
 tweets_stm <- tweets_stm %>% mutate(interactions = retweet_count + like_count + quote_count + reply_count) %>% 
-  mutate(inter.grp = ifelse(interactions > 0, "c1-100 Interaktionen", "dKeine Interaktionen")) %>% 
-  mutate(inter.grp = ifelse(interactions > 100, "b>100-1000 Interaktionen", inter.grp)) %>% 
-  mutate(inter.grp = ifelse(interactions > 1000, "a>1000 Interaktionen", inter.grp))
-for.plot <- tweets_stm %>% select(c(max.topic, topic_grp, inter.grp, interactions)) %>% mutate(max.topic = as.integer(max.topic)) %>%
+  mutate(inter.grp = ifelse(interactions > 0, "c 1-100 Interaktionen", "d Keine Interaktionen")) %>% 
+  mutate(inter.grp = ifelse(interactions > 100, "b 101-1000 Interaktionen", inter.grp)) %>%
+  mutate(inter.grp = ifelse(interactions > 1000, "a >1000 Interaktionen", inter.grp))
+for.plot <- tweets_stm %>% select(c(max.topic, topic_grp, inter.grp, interactions)) %>% 
+  mutate(max.topic = as.integer(max.topic)) %>%
   mutate(topic_grp = ifelse(topic_grp %in% c("News", "Person", "Spam"), topic_grp, "Undefiniert (mehrere)"))
 
 for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) + theme_minimal() + 
-  scale_y_continuous(labels = scales::number, breaks = c(0, 25000, 50000, 75000, 100000, 125000)) + 
+  scale_y_continuous(trans = "sqrt", labels = scales::number, breaks = c(0, 2500, 25000, 75000, 175000, 300000)) + 
   scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) +
-  scale_fill_discrete(name = "Summe aller\nInteraktionen\nje Tweet", labels = c(">1000", ">100-1000", "1-100", "0")) +
+  scale_fill_brewer(palette = "Set1", name = "Summe aller\nInteraktionen\nje Tweet", 
+                    labels = c(">1000", "101-1000", "1-100", "0")) +
   labs(title = "Anzahl an Interaktionen je Tweet und Topic", x = "Topic-Nummer", y = "Anzahl an Tweets je Topic",
-       subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
-# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen-, Spam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Die mit Abstand meisten Tweets fallen dabei auf ein einziges News-Topic.
+       subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") +
+  facet_wrap(~ topic_grp, nrow = 4)
+# Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen-, Spam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Zusätzlich zeigt sich eine Art Viralität der Tweets: Sie erhalten in etwa zu gleichen Teilen gar keine und nur wenig Aufmerksamkeit, oder zu gleichen Teilen mittel und viel Aufmerksamkeit.
 news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
 news_top68$tweet_text[sample(1:nrow(news_top68), 50)]
 head(news_top68$tweet_text, 50)
