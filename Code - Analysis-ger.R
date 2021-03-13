@@ -809,10 +809,37 @@ ggplot(tweets_stm, aes(x = max_prop)) + geom_histogram(colour = "black", fill = 
 
 
 ### Inhaltsanalysen ----
-tweets_eng_raw <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
-# Analysen anhand STM-Toptweets auf jeweils verwendete Formulierungen/Hashtags/..., dann Durchsuchung des Original-Datensets (englisch, keine Retweets, mit Duplikaten), um Reichweite und Umfang einschätzen zu können
+# Topics mit größtem Anteil
+plot(stm_model_90, type = "summary", xlim = c(0, 0.2), n = 5)
+
+# Topic 68
+top_68 <- tweets_stm %>% filter(max.topic == 68)
+top_68 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + 
+  geom_histogram(colour = "black", fill = "white", bins = 100) + 
+  scale_x_date(date_breaks = "2 months") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3))
+# Zwei Gruppen, Wechsel August 2016
+length(unique(top_68$userid))
+head(sort(table(top_68$userid), decreasing = T), 15)
+top_68_accts <- names(head(sort(table(top_68$userid), decreasing = T), 15))
+# Hauptsächlich Nachrichten-Accounts aus unterschiedlichen Regionen der USA
+users$user_display_name[users$userid %in% top_68_accts]
+
+top_68_first <- top_68 %>% filter(tweet_time < "2016-08-01")
+top_68_last <- top_68 %>% filter(tweet_time >= "2016-08-01")
+# Auf ersten Blick keine inhaltlichen Unterschiede vor/nach Einbruch
+usr_first <- users$user_display_name[users$userid %in% names(head(sort(table(top_68_first$userid), decreasing = T), 20))]
+usr_last <- users$user_display_name[users$userid %in% names(head(sort(table(top_68_last$userid), decreasing = T), 20))]
+table(usr_last %in% usr_first)
+
+# Topic 72
+
 
 ### Falschnachrichten
+tweets_eng_raw <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+
+# Analysen anhand STM-Toptweets auf jeweils verwendete Formulierungen/Hashtags/..., dann Durchsuchung des Original-Datensets (englisch, keine Retweets, mit Duplikaten), um Reichweite und Umfang einschätzen zu können
+
 # Ukrainischer Nuklearreaktor
 top <- 40 # Topics: 31, 40, 46
 { thought <- findThoughts(stm_model_90, n = 20, topics = top,
@@ -960,12 +987,10 @@ for.plot <- tweets_stm %>% select(c(max.topic, topic_grp, inter.grp, interaction
 
 for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) + theme_minimal() + 
   scale_y_continuous(trans = "sqrt", labels = scales::number, breaks = c(0, 2500, 25000, 75000, 175000, 300000)) + 
-  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) +
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89)) +
   scale_fill_brewer(palette = "Set1", name = "Summe aller\nInteraktionen\nje Tweet", 
                     labels = c(">1000", "101-1000", "1-100", "0")) +
-  labs(title = "Anzahl an Interaktionen je Tweet und Topic", x = "Topic-Nummer", y = "Anzahl an Tweets je Topic",
-       subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") +
-  facet_wrap(~ topic_grp, nrow = 4)
+  labs(x = "Topic-Nummer", y = "Anzahl an Tweets je Topic") + facet_wrap(~ topic_grp, nrow = 4)
 # Wie zu erwarten, dominieren News-Topics in der Menge - aber auch in der Anzahl an Tweets. Wie es scheint, waren die meisten Tweets entweder zu News-Themen oder wurden per stm diesem Komplex zugeordnet - Personen-, Spam- und nicht zuordnbare Tweets finden sich deutlich seltener in den Daten. Zusätzlich zeigt sich eine Art Viralität der Tweets: Sie erhalten in etwa zu gleichen Teilen gar keine und nur wenig Aufmerksamkeit, oder zu gleichen Teilen mittel und viel Aufmerksamkeit.
 news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
 news_top68$tweet_text[sample(1:nrow(news_top68), 50)]
@@ -1013,17 +1038,12 @@ replies_stm <- tweets_stm %>% filter(!(is.na(in_reply_to_tweetid)))
 for.plot <- replies_stm %>% select(c(max.topic, topic_grp, inter.grp, interactions)) %>% mutate(max.topic = as.integer(max.topic)) %>%
   mutate(topic_grp = ifelse(topic_grp %in% c("News", "Person", "Spam"), topic_grp, "Undefiniert (mehrere)"))
 for.plot %>% ggplot(aes(x = max.topic, fill = inter.grp)) + geom_bar(size = 1) + theme_minimal() + 
-  scale_y_continuous(labels = scales::number, breaks = c(0, 1000, 2000, 3000, 4000)) + 
+  scale_y_continuous(labels = scales::number, breaks = c(0, 1000, 2000, 3000, 4000, 5000)) + 
   scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) +
-  scale_fill_discrete(name = "Summe erhalte-\nner Interaktionen\nje Antwort", labels = c(">1000", ">100-1000", "1-100", "0")) +
-  labs(title = "Anzahl an Antworten auf andere Tweets", x = "Topic-Nummer", y = "Anzahl an Antwort-Tweets",
-       subtitle = "Zuordnung zu Topic nach max. theta des Tweets,\nInteraktionen = Antworten, Zitierungen, Likes und Retweets") + facet_wrap(~ topic_grp, nrow = 4)
+  scale_fill_brewer(palette = "Set1", name = "Summe erhalte-\nner Interaktionen\nje Antwort", 
+                    labels = c(">1000", ">100-1000", "1-100", "0")) +
+  labs(x = "Topic-Nummer", y = "Anzahl an Antwort-Tweets") + facet_wrap(~ topic_grp, nrow = 4)
 # Klare Dominanz von Antworten bei Spam-Tweets, mit deutlichen Unterschieden je nach Topic.
-
-
-
-
-
 
 # Interne Antworten
 replies_stm_int <- replies_stm %>% filter(in_reply_to_tweetid %in% tweets_stm$tweetid) %>%
@@ -1038,10 +1058,10 @@ for(i in 1:nrow(replies_stm_int)){
 replies_stm_int %>% 
   mutate(topic_grp = ifelse(topic_grp %in% c("News", "Person", "Spam"), topic_grp, "Undefiniert (mehrere)")) %>% 
   mutate(src_grp = ifelse(src_grp %in% c("News", "Person", "Spam"), src_grp, "Undefiniert (mehrere)")) %>% 
-  ggplot(aes(x = max.topic, y = src_grp)) + geom_count() + facet_wrap(~ topic_grp, nrow = 4) +
+  ggplot(aes(x = max.topic, y = src_grp)) + geom_count(aes(color = ..n.., size = ..n..)) + facet_wrap(~ topic_grp, nrow = 4) +
   scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 89, 99)) + theme_minimal() +
-  labs(title = "Verteilung interner Antworten", x = "Topic-Nummer", y = "Ziel-Topicgruppe",
-       subtitle = "Antworten an Tweets, die sich ebenfalls in den Daten finden, aufgeteilt nach Quellen- und Ziel-Topic") + facet_wrap(~ topic_grp, nrow = 4)
+  labs(x = "Topic-Nummer", y = "Ziel-Topicgruppe") + facet_wrap(~ topic_grp, nrow = 4) + guides(color = 'legend')
+  
 # Interne Antworten gehen dominant an News-Topics - aber an welche?
 replies_stm_int %>% mutate(src_grp = ifelse(src_grp %in% c("News", "Person", "Spam"), src_grp, "Undefiniert (mehrere)")) %>% 
   ggplot(aes(x = src_topic)) + geom_bar(size = 1) + theme_minimal() + 
