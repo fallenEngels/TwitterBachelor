@@ -130,17 +130,27 @@ users_eng <- users %>% filter(userid %in% tweets_eng$userid)
 # Deutlicher Nachlass in Tweets, 8,5 Mio -> 3 Mio (1/3), kaum Nachlass in Accounts mit mind. 1 englischsprachigen Tweet, 3608 -> 3077
 tweets_eng1 <- tweets %>% filter(tweet_language == "en" & userid %in% lang_excl$userid[lang_excl$eng_perc >= 50])
 users_eng1 <- users %>% filter(userid %in% tweets_eng1$userid)
-# Deutlicher NAchlass in Accounts, kaum Nachlass in Tweets -> wenig genutzte "bilinguale" Accounts
+# Deutlicher Nachlass in Accounts, kaum Nachlass in Tweets -> wenig genutzte, "bilinguale" Accounts
 diff <- tweets_eng[!(tweets_eng$tweetid %in% tweets_eng1$tweetid), ] %>% 
-  select(userid, account_creation_date, tweet_time) %>% mutate(tweet_time = as.Date(diff$tweet_time))
+  select(userid, account_creation_date, tweet_time) %>% mutate(tweet_time = as.Date(tweet_time))
 diff.long <- melt(diff, id.vars = "userid")
 diff.long %>% ggplot(aes(x = value, fill = variable)) + theme_minimal() +
   geom_histogram(bins = 100, position = "dodge") + labs(x = "Datum", y = "Anzahl") +
   scale_fill_discrete(name = "", labels = c("Account-\nErstelldatum", "Posting-Datum")) +
   theme(legend.position = "top")
-# ABER: Strukturelles Posting der "gering"-Accounts könnte inhaltlich relevant sein. Auf Verdacht also in den Daten lassen.
+# ABER: Strukturelles Posting der "gering"-Accounts Mitte/Ende 2014 könnte inhaltlich relevant sein. Auf Verdacht also in den Daten lassen, und für Analysen Nutzernamen dieser Spike speichern:
+data.frame(sort(table(diff$tweet_time), decreasing = T))[1:20,]
+spike <- diff %>% filter(tweet_time >= "2014-07-01" & tweet_time < "2014-10-01")
+spike_usr <- unique(spike$userid)
 
-rm(tweets, users, tweets_eng1, users_eng1, lang_excl, diff, diff.long)
+write_csv(spike_usr, file.path("Y:/Twitter Bachelor/Other Files/Spike_Users.csv"), na = "NA", append = FALSE, 
+          col_names = T, quote_escape = "double")
+# Daten laden: spike_usr <- read_csv("Y:/Twitter Bachelor/Other Files/Spike_Users.csv")
+
+# save(spike_usr, file = "Other Files/Spike_Users.RData")
+# DATEN LADEN: load("Other Files/Spike_Users.RData")
+
+rm(tweets, users, tweets_eng1, users_eng1, lang_excl, diff, diff.long, spike, spike_usr)
 
 
 
@@ -558,6 +568,9 @@ stm_dtm <- convert(dtm, to = "stm")
 used_documents <- names(stm_dtm$documents)
 used_documents <- used_documents %>% gsub("^text", "", .) %>% as.integer(.)
 
+# save(used_documents, file = "Other Files/Documents.RData")
+# DATEN LADEN: load("Other Files/Documents.RData")
+
 rm(dtm, toks)
 
 
@@ -821,9 +834,9 @@ top_68 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_tim
 # Zwei Gruppen, Wechsel August 2016
 length(unique(top_68$userid))
 head(sort(table(top_68$userid), decreasing = T), 15)
-top_68_accts <- names(head(sort(table(top_68$userid), decreasing = T), 15))
+top_68_accts <- users$user_display_name[users$userid %in% names(head(sort(table(top_68$userid), decreasing = T), 20))]
+top_68_accts
 # Hauptsächlich Nachrichten-Accounts aus unterschiedlichen Regionen der USA
-users$user_display_name[users$userid %in% top_68_accts]
 
 top_68_first <- top_68 %>% filter(tweet_time < "2016-08-01")
 top_68_last <- top_68 %>% filter(tweet_time >= "2016-08-01")
@@ -832,12 +845,37 @@ usr_first <- users$user_display_name[users$userid %in% names(head(sort(table(top
 usr_last <- users$user_display_name[users$userid %in% names(head(sort(table(top_68_last$userid), decreasing = T), 20))]
 table(usr_last %in% usr_first)
 
-# Topic 72
+rm(top_68, top_68_first, top_68_last, usr_first, usr_last)
 
+# Topic 72
+top_72 <- tweets_stm %>% filter(max.topic == 72)
+top_72 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + 
+  geom_histogram(colour = "black", fill = "white", bins = 100) + 
+  scale_x_date(date_breaks = "2 months") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3))
+top_72_accts <- users$user_display_name[users$userid %in% names(head(sort(table(top_72$userid), decreasing = T), 20))]
+top_72_accts
+# Erneut hauptsächlich News-Accounts
+table(top_72_accts %in% top_68_accts)
+
+rm(top_72)
+
+# Topic 66
+top_66 <- tweets_stm %>% filter(max.topic == 66)
+top_66 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + 
+  geom_histogram(colour = "black", fill = "white", bins = 100) + 
+  scale_x_date(date_breaks = "2 months") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3))
+top_66_accts <- users$user_display_name[users$userid %in% names(head(sort(table(top_66$userid), decreasing = T), 20))]
+top_66_accts
+# Wieder zu großen Teilen dieselben Accounts
+table(top_66_accts %in% top_68_accts); table(top_66_accts %in% top_72_accts)
+
+rm(top_66, top_66_accts, top_68_accts, top_72_accts)
 
 ### Falschnachrichten
 tweets_eng_raw <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
-
+load("Other Files/Spike_Users.RData")
 # Analysen anhand STM-Toptweets auf jeweils verwendete Formulierungen/Hashtags/..., dann Durchsuchung des Original-Datensets (englisch, keine Retweets, mit Duplikaten), um Reichweite und Umfang einschätzen zu können
 
 # Ukrainischer Nuklearreaktor
@@ -848,9 +886,11 @@ top <- 40 # Topics: 31, 40, 46
 consp.ukrNPP <- tweets_eng_raw[grepl("fukushima2015|fukushimaagain|chernobyl2015|Nukraine", 
                                      tweets_eng_raw$tweet_text, ignore.case = T), ]
 consp.ukrNPP <- consp.ukrNPP %>% mutate(conspiracy = "3 NPP Ukraine\nJan. 2015", 
-                                        interaction = reply_count + retweet_count + like_count + quote_count)
-summary(consp.ukrNPP$interaction)
+                                        interaction = reply_count + retweet_count + like_count + quote_count,
+                                        ident_spike = userid %in% spike_usr)
+summary(consp.ukrNPP$interaction); length(unique(consp.ukrNPP$userid))
 sum(grepl("fukushima2015|fukushimaagain|chernobyl2015|Nukraine", tweets_stm$tweet_text, ignore.case = T))
+
 
 # Columbian Chemicals
 top <- 33 # Topics: 24, 26, 33
@@ -860,8 +900,9 @@ top <- 33 # Topics: 24, 26, 33
 consp.ColChem <- tweets_eng_raw[grepl("columbianchemicals|columbianchemicalsinneworleans|Louisianaexplosion",
                                       tweets_eng_raw$tweet_text, ignore.case = T), ]
 consp.ColChem <- consp.ColChem %>% mutate(conspiracy = "1 Columbian Chemicals Explosion\nSep. 2014", 
-                                          interaction = reply_count + retweet_count + like_count + quote_count)
-summary(consp.ColChem$interaction)
+                                          interaction = reply_count + retweet_count + like_count + quote_count,
+                                          ident_spike = userid %in% spike_usr)
+summary(consp.ColChem$interaction); length(unique(consp.ColChem$userid))
 sum(grepl("columbianchemicals|columbianchemicalsinneworleans|Louisianaexplosion", tweets_stm$tweet_text, ignore.case = T))
 
 # Ebola in den USA
@@ -871,8 +912,9 @@ top <- 51 # Topics: 33, 51
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
 consp.Ebola <- tweets_eng_raw[grepl("Ebolainatlanta|YattaQuirre", tweets_eng_raw$tweet_text, ignore.case = T), ]
 consp.Ebola <- consp.Ebola %>% mutate(conspiracy = "2 Ebola in Atlanta\nDez. 13/14 2014", 
-                                      interaction = reply_count + retweet_count + like_count + quote_count)
-summary(consp.Ebola$interaction)
+                                      interaction = reply_count + retweet_count + like_count + quote_count,
+                                      ident_spike = userid %in% spike_usr)
+summary(consp.Ebola$interaction); length(unique(consp.Ebola$userid))
 sum(grepl("Ebolainatlanta|YattaQuirre", tweets_stm$tweet_text, ignore.case = T))
 
 # Verunreinigtes Trinkwasser
@@ -882,8 +924,9 @@ top <- 64 # Topic: 64
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
 consp.Water <- tweets_eng_raw[grepl("phosphorusdisaster", tweets_eng_raw$tweet_text, ignore.case = T), ]
 consp.Water <- consp.Water %>% mutate(conspiracy = "4 Polluted Water\nMar. 10 2015", 
-                                      interaction = reply_count + retweet_count + like_count + quote_count)
-summary(consp.Water$interaction)
+                                      interaction = reply_count + retweet_count + like_count + quote_count,
+                                      ident_spike = userid %in% spike_usr)
+summary(consp.Water$interaction); length(unique(consp.Water$userid))
 sum(grepl("phosphorusdisaster", tweets_stm$tweet_text, ignore.case = T))
 
 # Vergiftete Truthäne
@@ -894,8 +937,9 @@ top <- 61 # Topic: 61
 consp.Turkey <- tweets_eng_raw[grepl("kochfarms|foodpoisoning", tweets_eng_raw$tweet_text, ignore.case = T), ]
 # Ein einzelner Tweet nur mit #Foodpoisoning ohne Bezug zu Thanksgiving
 consp.Turkey <- consp.Turkey %>% filter(tweet_time >= "2015-11-26") %>% 
-  mutate(conspiracy = "5 Poisoned Turkey\nNov./Dez. 2015", interaction = reply_count + retweet_count + like_count + quote_count)
-summary(consp.Turkey$interaction)
+  mutate(conspiracy = "5 Poisoned Turkey\nNov./Dez. 2015", interaction = reply_count + retweet_count + like_count + quote_count,
+         ident_spike = userid %in% spike_usr)
+summary(consp.Turkey$interaction); length(unique(consp.Turkey$userid))
 sum(grepl("kochfarms|foodpoisoning", tweets_stm$tweet_text, ignore.case = T))
 
 
@@ -905,10 +949,15 @@ conspiracy_df %>% select(tweet_time, conspiracy) %>% ggplot(aes(x = tweet_time, 
   theme_minimal() +labs(x = "Tweet-Uhrzeit", y = "Anzahl an Tweets") +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5), legend.position = "none")
 
-rm(consp.ColChem, consp.Ebola, consp.Turkey, consp.ukrNPP, consp.Water, conspiracy_df)
+conspiracy_df %>% group_by(conspiracy) %>% summarise(ident_spike = sum(ident_spike))
+# Die erste dieser Fakenews-Kampagnen wurde von den identifizierten Accounts mit geringem englischsprachigen Anteil zumindest zu Teilen mitgetragen
+length(unique(consp.ColChem$userid)); sum(unique(consp.ColChem$userid) %in% spike_usr)
+# Beinahe die Hälfte der Accounts kommen aus der identifizierten Nutzergruppe mit kaum englischsprachigen Tweets
+rm(consp.ColChem, consp.Ebola, consp.Turkey, consp.ukrNPP, consp.Water, conspiracy_df, 
+   top, thought, spike_usr)
 
 
-### Gesellschaft/Politik
+### Gesellschaft und Politik
 # Texit
 top <- 6 # Topic: 6
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
@@ -928,17 +977,22 @@ top <- 81 # Topics: 78, 81
 soc.PolBrut <- tweets_stm[grepl("policeabuse|policebrutality|policestate|baltimorevsracism|copswillbecops",
                                 tweets_stm$tweet_text, ignore.case = T), ]
 # Hashtags statt Tweet_text, da "acab" Johnny Depps Chupacabra mit abgreift
+soc.PolBrut <- soc.PolBrut %>% mutate(interaction = reply_count + retweet_count + like_count + quote_count)
+
 ggplot(soc.PolBrut, aes(x = tweet_time)) + geom_histogram(bins = 100)
 summary(soc.PolBrut$interaction)
+ggplot(soc.PolBrut, aes(x = tweet_time, y = interaction)) + geom_point() + geom_smooth()
+summary(soc.PolBrut$interaction[soc.PolBrut$tweet_time < "2015-05-01"])
 
-
-# Black Representation
-top <- 81 # Topics: 78, 81
+# Black Lives Matter
+top <- 78 # Topics: 15, 78
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-soc.PolBrut <- tweets_stm[grepl("policeabuse|acab|policebrutality|policestate|baltimorevsracism|copswillbecops",
-                                tweets_stm$hashtags, ignore.case = T), ] 
+soc.blm <- tweets_stm[grepl("blacklivesmatter|blacktwitter",
+                                tweets_stm$tweet_text, ignore.case = T), ] 
+
+# Black Representation
 
 # Clinton-Emails
 top <- 55 # Topic: 55
@@ -972,6 +1026,14 @@ soc.SethRich <- tweets_stm[grepl("seth rich|sethrich|dnc staffer",tweets_stm$twe
 
 # Pizzagate und QAnon generell
 soc.Conspir <- tweets_stm[grepl("pizzagate|qanon|podesta.*art|art.*podesta",tweets_stm$tweet_text, ignore.case = T), ]
+
+
+
+
+
+
+
+
 
 
 ### Strukturanalysen ----
@@ -1169,7 +1231,7 @@ tweets_stm <- tweets_stm %>% mutate(max.topic = ifelse(max_prop >= 0.15, max.top
 
 tweets_stm %>% ggplot(aes(x = interactions)) + geom_histogram(bins = 70) + 
   scale_x_continuous(trans = "sqrt") + scale_y_continuous(trans = "sqrt")
-asd
+
 
 
 

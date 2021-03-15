@@ -23,33 +23,46 @@
   setwd("Y:/Twitter Bachelor")
 }
 
+
 # Verwendete Twitter-Datensätze ----
 
-users <- read_csv("Twitter Data/ira_users_csv_hashed.csv") # Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
+users <- as.data.frame(read_csv("Twitter Data/ira_users_csv_hashed.csv"))
+# Datensatz der Nutzer, Version vom 05.02.2019 (aktuellste Version, Stand Juli 2020)
 
-tweets <- read_csv("Twitter Data/ira_tweets_csv_hashed.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
-tweets_oldver <- read_csv("Twitter Data/ira_tweets_csv_hashed_alt.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_character(), longitude = col_character(), poll_choices = col_character())) # Datensatz der Tweets, Version vom 15.10.2018
+tweets <- as.data.frame(read_csv("Twitter Data/ira_tweets_csv_hashed.csv", 
+                                 col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(),
+                                                  in_reply_to_tweetid = col_character(), latitude = col_factor(), 
+                                                  longitude = col_factor(), poll_choices = col_character()))) 
+# Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
 
-# Analyse Tweets ----
-load("Saved Files/users_ggplot.RData")
 
 # Cleanup Data Sets ----
-tweets_eng <- read_csv("Twitter Data/tweets_en-cleaned.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+tweets_eng <- read_csv("Twitter Data/tweets_en-norts-nodupes.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
 
-tweets_clean <- tweets_eng[which(!(duplicated(tweets_eng$tweet_text))), ]
-rm(tweets_eng)
+tweets_clean <- read_csv("Twitter Data/tweets_clean-nodupes.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+
 
 # STM - Vorbereitung und Suche nach K ----
 load("Saved Files/stm_dtm.RData")
 
-used_documents <- names(stm_dtm$documents)
-used_documents <- used_documents %>% gsub("^text", "", .) %>% as.integer(.)
+load("Other Files/Documents.RData")
+# Liste: used_documents
 
-load("selectK.RData")
+load("Saved Files/selectK.RData")
+
 
 # STM - Interpretation ----
-label_csv <- read.csv("Other Files/STM_TopicLabels.csv", sep = ';', stringsAsFactors = F)
-
 load("Saved Files/stm_mod_90.RData")
 
-tweets_stm <- read_csv("Other Files/tweets_stm.csv", col_types = cols(tweetid = col_character(), in_reply_to_tweetid = col_character()))
+label_csv <- read.csv("Other Files/STM_TopicLabels.csv", sep = ';', stringsAsFactors = F)
+
+
+# Rückbezug auf Originaltweets ----
+tweets_stm <- read_csv("Other Files/tweets_stm.csv", col_types = cols(tweetid = col_character(), in_reply_to_tweetid = col_character(), quoted_tweet_tweetid = col_character()))
+
+
+# Inhaltsanalysen ----
+tweets_eng_raw <- read_csv("Twitter Data/tweets_en-norts.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
+
+load("Other Files/Spike_Users.RData")
+# Liste: spike_usr
