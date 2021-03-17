@@ -1,7 +1,8 @@
 # Packages und Vorbereitung ----
 # Alle Analysen wurden mit R-Version 4.0.2 und RStudio 1.3.959 durchgeführt. Verwendete Packages werden hier gesammelt gelistet:
 
-packages <- c("dplyr", "readr", "tidyr", "stringi", "stringr", "tibble", "ggplot2", "reshape2", "corrplot", "cowplot", "lubridate", "magrittr", "tm", "stm", "RColorBrewer", "scales")
+packages <- c("dplyr", "readr", "tidyr", "stringr", "stringi", "ggplot2", "reshape2", "corrplot", 
+              "gridExtra","lubridate","quanteda", "stm", "RColorBrewer", "scales")
 for (pkg in packages) {
   if (pkg %in% rownames(installed.packages()) == FALSE)
   {install.packages(pkg)}
@@ -11,33 +12,11 @@ rm(packages, pkg)
 {
   library(dplyr)
   library(readr)
-  library(tibble)
-  library(ggplot2)
-  library(reshape2)
-  library(RColorBrewer)
-  library(corrplot)
-  library(cowplot)
-  library(tidyr)
-  library(stringi)
-  library(stringr)
-  library(lubridate)
-  library(quanteda)
-  library(magrittr)
-  library(tm)
-  library(stm)
-  
-  set.seed(2020)
-  setwd("Y:/Twitter Bachelor")
-}
-
-{
-  library(dplyr)
-  library(readr)
   library(tidyr)
   library(stringr)
   library(stringi)
-  library(reshape2)
   library(ggplot2)
+  library(reshape2)
   library(corrplot)
   library(gridExtra)
   library(lubridate)
@@ -143,9 +122,9 @@ data.frame(sort(table(diff$tweet_time), decreasing = T))[1:20,]
 spike <- diff %>% filter(tweet_time >= "2014-07-01" & tweet_time < "2014-10-01")
 spike_usr <- unique(spike$userid)
 
-write_csv(spike_usr, file.path("Y:/Twitter Bachelor/Other Files/Spike_Users.csv"), na = "NA", append = FALSE, 
+write_csv(spike_usr, file.path("Other Files/Spike_Users.csv"), na = "NA", append = FALSE, 
           col_names = T, quote_escape = "double")
-# Daten laden: spike_usr <- read_csv("Y:/Twitter Bachelor/Other Files/Spike_Users.csv")
+# Daten laden: spike_usr <- read_csv("Other Files/Spike_Users.csv")
 
 # save(spike_usr, file = "Other Files/Spike_Users.RData")
 # DATEN LADEN: load("Other Files/Spike_Users.RData")
@@ -387,7 +366,8 @@ rm(followbots, nobots, lm_df)
 
 
 ### Tweet-Zeiten
-times <- tibble(dt = tweets_eng$tweet_time %>% ymd_hms()) %>%
+times <- tibble(dt = tweets_eng$tweet_time %>% ymd_hms())
+times <- times %>%
   mutate(timepart = hms::hms(as.numeric(times$dt - floor_date(times$dt, "1 day"), unit="secs")), 
          timeset = as.integer(substr(timepart,1,2))) %>%  mutate(timeset_ru = timeset + 3) %>% 
   mutate(timeset_ru = ifelse(timeset_ru >23, timeset_ru - 24, timeset_ru))
@@ -402,6 +382,7 @@ ggplot(times_plot, aes(x = time_ru, y = (tweetnum-median(tweetnum)))) +
   geom_col(fill = "#4A3FC6") + theme_minimal() + 
   labs(x = "Uhrzeit Westrussland (MSK, in Stunden)", y = "Anzahl Tweets (Median-Normalisiert)")
 # Manuelle Einfügung der Uhrzeiten in anderem Grafikprogramm
+median(times_plot$tweetnum)
 rm(times, times_plot)
 
 
@@ -826,18 +807,24 @@ ggplot(tweets_stm, aes(x = max_prop)) + geom_histogram(colour = "black", fill = 
 plot(stm_model_90, type = "summary", xlim = c(0, 0.2), n = 5)
 
 # Topic 68
-top_68 <- tweets_stm %>% filter(max.topic == 68)
-top_68 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + 
-  geom_histogram(colour = "black", fill = "white", bins = 100) + 
-  scale_x_date(date_breaks = "2 months") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.3))
+top_68 <- tweets_stm %>% filter(max.topic == 68) %>% 
+  mutate(interaction = reply_count + retweet_count + like_count + quote_count, grp = floor_date(tweet_time, unit = "month"))
+top_68 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(top_68$grp))) + 
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) + 
+  labs(x = "Datum", y = "Anzahl an Tweets")
 # Zwei Gruppen, Wechsel August 2016
+top_68 %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot() + theme_minimal() +
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  scale_y_continuous(trans = "sqrt", breaks = c(250, 1000, 5000, 10000, 20000, 30000, 40000, 50000)) + 
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+# Interaktionen erst ab Wechsel der Gruppen, dann aber nur vereinzelt
 length(unique(top_68$userid))
 head(sort(table(top_68$userid), decreasing = T), 15)
 top_68_accts <- users$user_display_name[users$userid %in% names(head(sort(table(top_68$userid), decreasing = T), 20))]
 top_68_accts
 # Hauptsächlich Nachrichten-Accounts aus unterschiedlichen Regionen der USA
-
 top_68_first <- top_68 %>% filter(tweet_time < "2016-08-01")
 top_68_last <- top_68 %>% filter(tweet_time >= "2016-08-01")
 # Auf ersten Blick keine inhaltlichen Unterschiede vor/nach Einbruch
@@ -848,11 +835,18 @@ table(usr_last %in% usr_first)
 rm(top_68, top_68_first, top_68_last, usr_first, usr_last)
 
 # Topic 72
-top_72 <- tweets_stm %>% filter(max.topic == 72)
-top_72 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + 
-  geom_histogram(colour = "black", fill = "white", bins = 100) + 
-  scale_x_date(date_breaks = "2 months") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.3))
+top_72 <- tweets_stm %>% filter(max.topic == 72) %>%
+  mutate(interaction = reply_count + retweet_count + like_count + quote_count, grp = floor_date(tweet_time, unit = "month"))
+top_72 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(top_72$grp))) + 
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Anzahl an Tweets")
+top_72 %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot() + theme_minimal() +
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  scale_y_continuous(trans = "sqrt", breaks = c(50, 250, 1000, 2500, 5000, 10000, 20000, 30000)) + 
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+# ähnliches Muster - Veränderungen der Postfrequenz, vereinzelter Anstieg an Reichweite
 top_72_accts <- users$user_display_name[users$userid %in% names(head(sort(table(top_72$userid), decreasing = T), 20))]
 top_72_accts
 # Erneut hauptsächlich News-Accounts
@@ -861,11 +855,19 @@ table(top_72_accts %in% top_68_accts)
 rm(top_72)
 
 # Topic 66
-top_66 <- tweets_stm %>% filter(max.topic == 66)
-top_66 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + 
-  geom_histogram(colour = "black", fill = "white", bins = 100) + 
-  scale_x_date(date_breaks = "2 months") + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.3))
+top_66 <- tweets_stm %>% filter(max.topic == 66) %>% 
+  mutate(interaction = reply_count + retweet_count + like_count + quote_count, grp = floor_date(tweet_time, unit = "month"))
+top_66 %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(top_66$grp))) + 
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Anzahl an Tweets")
+# AUch hier Einbruch Juli/August 2016
+top_66 %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot() + theme_minimal() +
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  scale_y_continuous(trans = "sqrt", breaks = c(50, 250, 1000, 2500, 5000, 10000, 15000)) + 
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+# Erneut vereinzelt deutliche Aktivitätsgewinne nach Umbruch
 top_66_accts <- users$user_display_name[users$userid %in% names(head(sort(table(top_66$userid), decreasing = T), 20))]
 top_66_accts
 # Wieder zu großen Teilen dieselben Accounts
@@ -957,18 +959,7 @@ rm(consp.ColChem, consp.Ebola, consp.Turkey, consp.ukrNPP, consp.Water, conspira
    top, thought, spike_usr)
 
 
-### Gesellschaft und Politik
-# Texit
-top <- 6 # Topic: 6
-{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
-                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
-  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-soc.Texit <- tweets_stm[grepl("texit", tweets_stm$tweet_text, ignore.case = T), ]
-# Ein News-Tweet aus 2017 hat nichts mit dem Rest zu tun
-soc.Texit <- soc.Texit %>% filter(tweet_time <= "2017-01-01") %>%
-  mutate(interaction = reply_count + retweet_count + like_count + quote_count)
-summary(soc.Texit$interaction)
-
+### Gesellschaft: BLM, Polizeigewalt, Black History, ...
 # Polizeigewalt
 top <- 81 # Topics: 78, 81
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
@@ -977,57 +968,138 @@ top <- 81 # Topics: 78, 81
 soc.PolBrut <- tweets_stm[grepl("policeabuse|policebrutality|policestate|baltimorevsracism|copswillbecops",
                                 tweets_stm$tweet_text, ignore.case = T), ]
 # Hashtags statt Tweet_text, da "acab" Johnny Depps Chupacabra mit abgreift
-soc.PolBrut <- soc.PolBrut %>% mutate(interaction = reply_count + retweet_count + like_count + quote_count)
+soc.PolBrut <- soc.PolBrut %>% mutate(interaction = reply_count + retweet_count + like_count + quote_count, 
+                                      grp = floor_date(tweet_time, unit = "14 days")) # weil weniger Daten
 
-ggplot(soc.PolBrut, aes(x = tweet_time)) + geom_histogram(bins = 100)
-summary(soc.PolBrut$interaction)
-ggplot(soc.PolBrut, aes(x = tweet_time, y = interaction)) + geom_point() + geom_smooth()
-summary(soc.PolBrut$interaction[soc.PolBrut$tweet_time < "2015-05-01"])
+soc.PolBrut %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(soc.PolBrut$grp))) + 
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Anzahl an Tweets")
+# Spikes am Anfang, dann konstante Aktivität
+soc.PolBrut %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot(varwidth = F) + theme_minimal() +
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+# Deutlicher Anstieg an Interaktionen im Lauf der Zeit
+rm(soc.PolBrut)
 
 # Black Lives Matter
-top <- 78 # Topics: 15, 78
+top <- 36 # Topics: 36, 78
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-soc.blm <- tweets_stm[grepl("blacklivesmatter|blacktwitter",
-                                tweets_stm$tweet_text, ignore.case = T), ] 
+soc.Blm <- tweets_stm[grepl("blacklivesmatter|blacktwitter|black lives",
+                            tweets_stm$tweet_text, ignore.case = T), ]
+soc.Blm <- soc.Blm %>% mutate(interaction = reply_count + retweet_count + like_count + quote_count, 
+                              grp = floor_date(tweet_time, unit = "month"))
+
+soc.Blm %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(soc.Blm$grp))) + 
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Anzahl an Tweets")
+# Kleinere Spitzen für eben identifizierte Daten, durchgängige AKtivität, Nachlass Ende 2016 und erneut Ende 2017
+soc.Blm %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot() + theme_minimal() +
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  scale_y_continuous(trans = "sqrt", breaks = c(250, 2000, 7000, 15000, 30000, 50000, 70000, 90000)) +
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+# Wachsende Zahl an Interaktionen im Lauf der Zeit, Maximum Oktober/November 2016
+rm(soc.Blm)
 
 # Black Representation
+top <- 58 # Topics: 15, 58, 83
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.BlackRep <- tweets_stm[grepl("blackhistory|luther king|mlk|malcom x|malcomx",
+                            tweets_stm$tweet_text, ignore.case = T), ]
+# Schlechtes Einfangen durch Worte, da generelle Sentimente ohne konkrete Wortgleichheiten vorkommen
+soc.BlackRep_topic <- tweets_stm %>% filter(max.topic == 58 & max_prop >= 0.4)
+# Versuch, über Topic-Propoertionen zumindest annähernd Inhalte einzufangen
+soc.BlackRep_bound <- rbind(soc.BlackRep, soc.BlackRep_topic)
+soc.BlackRep_bound <- soc.BlackRep_bound[!duplicated(soc.BlackRep_bound$tweetid), ] #Entfernen duplikater Reihen
+soc.BlackRep_bound <- soc.BlackRep_bound %>% mutate(interaction = reply_count + retweet_count + like_count + quote_count, 
+                                                    grp = floor_date(tweet_time, unit = "month"))
 
-# Clinton-Emails
+soc.BlackRep_bound %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(soc.BlackRep_bound$grp))) + 
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Anzahl an Tweets")
+# Spitzen in Februar -> Black History Month, auch hier wieder Nachlass 2017 + 2018
+soc.BlackRep_bound %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot() + theme_minimal() +
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  scale_y_continuous(trans = "sqrt", breaks = c(250, 2500, 20000, 50000, 100000, 200000, 300000, 500000)) +
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+# Erste Spitzen zu Black History Month 2016, deutlicher Zugewinn ab Ende 2016
+rm(soc.BlackRep, soc.BlackRep_bound, soc.BlackRep_topic)
+
+### Politik
+# Texit
+top <- 6 # Topic: 6
+{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
+                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
+  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
+soc.Texit <- tweets_stm[grepl("texit", tweets_stm$tweet_text, ignore.case = T), ]
+# Ein News-Tweet aus 2017 hat nichts mit dem Rest zu tun
+soc.Texit <- soc.Texit %>% filter(tweet_time <= "2017-01-01") %>%
+  mutate(interaction = reply_count + retweet_count + like_count + quote_count, 
+         grp = floor_date(tweet_time, unit = "2 days"))
+soc.Texit %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(soc.Texit$grp))) + 
+  scale_x_date(date_breaks = "week") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Anzahl an Tweets")
+soc.Texit %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot() + theme_minimal() +
+  scale_x_date(date_breaks = "week") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+# Größtenteils irrelevant
+
+# Hillary Clinton - Emails und Benghazi
 top <- 55 # Topic: 55
 { thought <- findThoughts(stm_model_90, n = 20, topics = top, 
                           text = tweets_eng$tweet_text[used_documents])$docs[[1]]
   plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-soc.Clinton <- tweets_stm[grepl("clinton",tweets_stm$tweet_text, ignore.case = T) &
-                            grepl("mail",tweets_stm$tweet_text, ignore.case = T), ]
+soc.Clinton <- tweets_stm[grepl("clinton.*mail|mail.*clinton|podesta.*mail|mail.*podesta|dncleak|clinton.*benghazi|benghazi.*clinton",tweets_stm$tweet_text, ignore.case = T), ]
+soc.Clinton <- soc.Clinton %>% mutate(interaction = reply_count + retweet_count + like_count + quote_count,
+                                      grp = floor_date(tweet_time, unit = "month"))
+soc.Clinton %>% mutate(tweet_time = as.Date(tweet_time)) %>% ggplot(aes(x = tweet_time)) + theme_minimal() + 
+  geom_histogram(colour = "black", fill = "white", bins = length(unique(soc.Clinton$grp))) + 
+  scale_x_date(date_breaks = "2 month") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  labs(x = "Datum", y = "Anzahl an Tweets")
+soc.Clinton %>% mutate(tweet_time = as.Date(tweet_time))  %>%
+  ggplot(aes(x = tweet_time, y = interaction, group = grp)) + geom_boxplot() + theme_minimal() +
+  scale_x_date(date_breaks = "2 months") + theme(axis.text.x = element_text(angle = 90, vjust = 0.3)) +
+  scale_y_continuous(trans = "sqrt", breaks = c(50, 250, 1000, 2500, 5000, 10000, 15000)) +
+  labs(x = "Datum", y = "Interaktionen je Tweet")
+accts <- unique(head(soc.Clinton$userid[order(soc.Clinton$interaction, decreasing = T)], 50))
+users$user_screen_name[users$userid %in% accts]
+users$follower_count[users$userid %in% accts]
 
-# Ehe für alle
-top <- 55 # Topic: 55
-{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
-                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
-  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-soc.Clinton <- tweets_stm[grepl("clinton.*mail|mail.*clinton|podesta.*mail|mail.*podesta",
-                                tweets_stm$tweet_text, ignore.case = T), ]
-
-# Wikileaks
-top <- 55 # Topic: 55
-{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
-                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
-  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-soc.Wiki <- tweets_stm[grepl("wikileaks|vault.*7",tweets_stm$tweet_text, ignore.case = T), ]
-
-# Seth Rich
-top <- 5 # Topic: 55
-{ thought <- findThoughts(stm_model_90, n = 20, topics = top, 
-                          text = tweets_eng$tweet_text[used_documents])$docs[[1]]
-  plotQuote(thought, width = 90, main = paste("Topic", top, sep = " ")) }
-soc.SethRich <- tweets_stm[grepl("seth rich|sethrich|dnc staffer",tweets_stm$tweet_text, ignore.case = T), ]
-
-# Pizzagate und QAnon generell
-soc.Conspir <- tweets_stm[grepl("pizzagate|qanon|podesta.*art|art.*podesta",tweets_stm$tweet_text, ignore.case = T), ]
-
-
+# Election Day
+soc.Election <- tweets_stm %>% filter(tweet_time >= "2016-11-07" & tweet_time <= "2016-11-09")
+elect_hash <- soc.Election$hashtags
+for(i in 1:length(elect_hash)){
+  elect_hash[i] <- ifelse(grepl("trumpforpresident|MAGA|makeamericagreatagain|trumppence|lockherup|hillaryforprison|votetrump|crookedhillary|corrupthillary|trump2k16|imnotwithher|trumpagainstterrorism|abovethelaw|hillaryrottenclinton|dncleak|draintheswamp|crooked",
+                                elect_hash[i], ignore.case = T),
+                          "Pro-Trump", elect_hash[i])
+  elect_hash[i] <- ifelse(grepl("imwithher", elect_hash[i], ignore.case = T),
+                          "Pro-Clinton", elect_hash[i])
+  elect_hash[i] <- ifelse(grepl("police|blacklivesmatter|kaepernick|representationmatters|blackpanther|blacktwitter|amerikkka|blueprivilege|stopracism|stopwhitewashing", elect_hash[i], ignore.case = T), "BLM-Police", elect_hash[i])
+  elect_hash[i] <- ifelse(grepl("imvotingbecause|ivoted|elections2016|electionday|electionnight|myvote", elect_hash[i], ignore.case = T), "voting", elect_hash[i])
+  elect_hash[i] <- ifelse(grepl("Aleppo|isis|syria|turkey|raqqa|iraq|saa|saf|hama", elect_hash[i], ignore.case = T),
+                          "Middle East", elect_hash[i])
+  elect_hash[i] <- ifelse(grepl("riggedelection|voterfraud|voterid|earlyvoting|stopthesteal", elect_hash[i], ignore.case = T),
+                          "Voting process", elect_hash[i])
+  elect_hash[i] <- ifelse(grepl("2016electionin3words|electionfinalthoughts", elect_hash[i], ignore.case = T),
+                          "Election trending hashtags", elect_hash[i])
+  elect_hash[i] <- ifelse(grepl("thingspeopleontwitterlike|wtfamericain5words", elect_hash[i], ignore.case = T),
+                          "General trending hashtags", elect_hash[i])
+  elect_hash[i] <- ifelse(is.na(elect_hash[i]), "None", elect_hash[i])
+  elect_hash[i] <- ifelse(!(grepl("Pro-Trump|Pro-Clinton|BLM-Police|voting|Middle East|Voting process|Election trending hashtags|General trending hashtags|None", elect_hash[i], ignore.case = T)), "Other", elect_hash[i])
+}
+table(elect_hash)
+# Eindeutige Pro-Trump-Stimmung, mit 716 Tweets unter Pro-Trump/Anti-Hillary-Tweets, und einem (möglicherweise sarkastischen?) Pro-Hillary-Tweet
 
 
 
@@ -1036,7 +1108,14 @@ soc.Conspir <- tweets_stm[grepl("pizzagate|qanon|podesta.*art|art.*podesta",twee
 
 
 
-### Strukturanalysen ----
+
+
+
+### Ungenutzte weitere Analysen ----
+### Alles was folgt, wurde aus Zeit- bzw. Platzgründen (Seitenzahlen) für den Rest der Arbeit nicht weiter verfolgt, da es sich nicht als bedeutsam genug herausstellte, um andere, bereits vertretene Punkte aus der Arbeit zu streichen. Aus diesem Grund funktioniert der folgende Code unter Umständen auch nur bedingt bzw. gar nicht, und wird nur der Vollständigkeit halber präsentiert.
+
+
+### Strukturanalysen
 
 # Interaktionen und Tweet-Mengen nach Topics
 tweets_stm <- tweets_stm %>% mutate(interactions = retweet_count + like_count + quote_count + reply_count) %>% 
@@ -1141,8 +1220,6 @@ tweets_stm %>% filter(max.topic == 89) %>% filter(interactions > 0) %>%
 # Dominant anti-Flüchtlings- und anti-Islam-Rhetorik.
 
 
-
-
 ### Analyse von News-Topics mit gesellschaftlicher Relevanz: Überprüfung aller News-Topics auf mehrfach auftretende Themenkomplexe zu politischen/gesellschaftlihen Themen, die sich in ein Rechts-Links-Spektrum einordnen lassen und Interaktionen erhielten.
 # Aufbau Rechts-Links-Spektrum durch Extraktion von Kern-Themen und -Phrasen aus den jeweiligen Topics und Zuordnung zu jeweiliger Seite.
 news_top <- tweets_stm %>% filter(max.topic == 4) %>% filter(interactions > 0) %>% 
@@ -1181,14 +1258,6 @@ table(grepl("migrant|build the wall|build that wall|guccifer|seth rich", news_to
 rw_news <- bind_rows(rw_news, tweets_stm[tweets_stm$tweetid %in% news_top$tweetid[
   which(grepl("migrant|build the wall|build that wall", 
               news_top$tweet_text, ignore.case = T))], c(1:4, 15, 19)])
-
-
-
-
-
-
-
-
 
 
 news_top68 <- tweets_stm %>% filter(max.topic == 68) %>% filter(interactions > 0) %>% arrange(desc(interactions))
@@ -1231,9 +1300,6 @@ tweets_stm <- tweets_stm %>% mutate(max.topic = ifelse(max_prop >= 0.15, max.top
 
 tweets_stm %>% ggplot(aes(x = interactions)) + geom_histogram(bins = 70) + 
   scale_x_continuous(trans = "sqrt") + scale_y_continuous(trans = "sqrt")
-
-
-
 
 
 # Oh No Its Distances

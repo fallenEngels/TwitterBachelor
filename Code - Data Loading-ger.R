@@ -35,6 +35,9 @@ tweets <- as.data.frame(read_csv("Twitter Data/ira_tweets_csv_hashed.csv",
                                                   longitude = col_factor(), poll_choices = col_character()))) 
 # Datensatz der Tweets, Version vom 11.02.2019 (aktuellste Version, Stand Juli 2020)
 
+# Deskriptive Analysen ----
+tweets_eng <- tweets %>% filter(tweet_language == "en")
+users_eng <- users %>% filter(userid %in% tweets_eng$userid)
 
 # Cleanup Data Sets ----
 tweets_eng <- read_csv("Twitter Data/tweets_en-norts-nodupes.csv", col_types = cols(tweetid = col_character(), retweet_tweetid = col_character(), in_reply_to_tweetid = col_character(), latitude = col_factor(), longitude = col_factor(), poll_choices = col_character()))
