@@ -91,7 +91,7 @@ lang_excl.long <- melt(lang_excl.long, id.vars = "userid")
 lang_excl.long %>% ggplot(aes(x = variable, y = value, fill = variable)) + geom_violin() + theme_minimal() +
   labs(x = "Sprache", y = "Anteil an Tweets je Account in %") + theme(legend.position="none") +
   scale_x_discrete(labels=c("Englisch", "Russisch", "Andere")) +
-  scale_fill_discrete(name = "Sprache", labels = c("Englisch", "Russisch", "Andere"))
+  scale_fill_brewer(palette="Set1",name = "Sprache", labels = c("Englisch", "Russisch", "Andere"))
 # Sprachauswahl scheint dominant Accounts zu bestimmen, kaum Accounts unter ~80% einer Sprache -> gute Filtermöglichkeit, Dominanz anderer Sprachen on ~5-10% je Account lässt strukturelles Mislabeling bestimmter (zu kurzer?) Tweets vermuten
 rm(lang_excl.long)
 # "Falsche" Sprachen genauer analysiert
@@ -115,7 +115,7 @@ diff <- tweets_eng[!(tweets_eng$tweetid %in% tweets_eng1$tweetid), ] %>%
 diff.long <- melt(diff, id.vars = "userid")
 diff.long %>% ggplot(aes(x = value, fill = variable)) + theme_minimal() +
   geom_histogram(bins = 100, position = "dodge") + labs(x = "Datum", y = "Anzahl") +
-  scale_fill_discrete(name = "", labels = c("Account-\nErstelldatum", "Posting-Datum")) +
+  scale_fill_brewer(palette="Set1", name = "", labels = c("Account-\nErstelldatum", "Posting-Datum")) +
   theme(legend.position = "top")
 # ABER: Strukturelles Posting der "gering"-Accounts Mitte/Ende 2014 könnte inhaltlich relevant sein. Auf Verdacht also in den Daten lassen, und für Analysen Nutzernamen dieser Spike speichern:
 data.frame(sort(table(diff$tweet_time), decreasing = T))[1:20,]

@@ -4,23 +4,18 @@
 {
   library(dplyr)
   library(readr)
-  library(tibble)
+  library(tidyr)
+  library(stringr)
+  library(stringi)
   library(ggplot2)
   library(reshape2)
-  library(RColorBrewer)
   library(corrplot)
-  library(cowplot)
-  library(tidyr)
-  library(stringi)
-  library(stringr)
+  library(gridExtra)
   library(lubridate)
   library(quanteda)
-  library(magrittr)
-  library(tm)
   library(stm)
   
-  set.seed(2020)
-  setwd("Y:/Twitter Bachelor")
+  setwd("Y:/Twitter Bachelor") # Y: mit jeweiligem Stick-Ordner ersetzen
 }
 
 
